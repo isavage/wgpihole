@@ -1,6 +1,6 @@
 services:
   pihole:
-    image: .pihole/pihole:latest
+    image: .pihole/pihole:latest # Official PiHole image
     container_name: pihole
     networks:
       wgpihole.net:
