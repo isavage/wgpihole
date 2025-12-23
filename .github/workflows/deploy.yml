@@ -104,13 +104,15 @@ services:
     restart: unless-stopped
 EOF
           
-          cat << 'EOF' > blocklists.conf
+          # Generate blocklists.conf
+          cat > blocklists.conf << 'EOF_BLOCKLISTS'
 $(cat blocklists.conf)
-EOF
+EOF_BLOCKLISTS
           
-          cat << 'EOF' > .env
+          # Generate .env file
+          cat > .env << 'EOF_ENV'
 $(cat .env.example | sed 's|<your_pihole_password_here>|${{ secrets.PIHOLE_WEBPASSWORD }}|g' | sed 's|<your_bcrypt_hash_here>|${{ secrets.WGEASY_PASSWORD_HASH }}|g' | sed 's|<your_public_ip_or_domain>|${{ vars.WG_HOST }}|g' | sed 's|America/New_York|${{ vars.TZ }}|g')
-EOF
+EOF_ENV
           
           # Copy scripts
           cat << 'EOF' > scripts/init-blocklists.sh
