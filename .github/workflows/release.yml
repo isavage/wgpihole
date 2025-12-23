@@ -37,7 +37,7 @@ jobs:
           echo '📁 Deploying release ${{ github.event.release.tag_name }}...'
           
           # Generate docker-compose.yml with environment variables
-          cat > docker-compose.yml << 'EOF'
+          cat > docker-compose.yml << 'EOF_DOCKER_COMPOSE'
 version: '3.7'
 
 services:
@@ -79,7 +79,7 @@ services:
       - net.ipv4.ip_forward=1
       - net.ipv4.conf.all.src_valid_mark=1
     restart: unless-stopped
-EOF
+EOF_DOCKER_COMPOSE
           
           # Generate blocklists.conf
           cat > blocklists.conf << 'EOF_BLOCKLISTS'
