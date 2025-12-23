@@ -59,16 +59,17 @@ jobs:
           echo ' Deploying configuration files...'
           
           # Copy core files
-          cat << 'EOF' > docker-compose.yml
-$(cat docker-compose.yml | sed 's|${PIHOLE_WEBPASSWORD}|${{ secrets.PIHOLE_WEBPASSWORD }}|g' | sed 's|${WGEASY_PASSWORD_HASH}|${{ secrets.WGEASY_PASSWORD_HASH }}|g' | sed 's|${WG_HOST}|${{ secrets.WG_HOST }}|g' | sed 's|${WG_ALLOWED_IPS}|${{ secrets.WG_ALLOWED_IPS }}|g' | sed 's|${TZ}|${{ secrets.TZ }}|g')
-EOF
+          # Create docker-compose.yml with proper YAML escaping
+          cat > docker-compose.yml << 'EOF_DOCKER_COMPOSE'
+$(cat docker-compose.yml | sed 's|${PIHOLE_WEBPASSWORD}|${{ secrets.PIHOLE_WEBPASSWORD }}|g' | sed 's|${WGEASY_PASSWORD_HASH}|${{ secrets.WGEASY_PASSWORD_HASH }}|g' | sed 's|${WG_HOST}|${{ vars.WG_HOST }}|g' | sed 's|${WG_ALLOWED_IPS}|${{ vars.WG_ALLOWED_IPS }}|g' | sed 's|${TZ}|${{ vars.TZ }}|g' | sed 's/\/\\/g' | sed 's/\$/\\$/g')
+EOF_DOCKER_COMPOSE
           
           cat << 'EOF' > blocklists.conf
 $(cat blocklists.conf)
 EOF
           
           cat << 'EOF' > .env
-$(cat .env.example | sed 's|<your_pihole_password_here>|${{ secrets.PIHOLE_WEBPASSWORD }}|g' | sed 's|<your_bcrypt_hash_here>|${{ secrets.WGEASY_PASSWORD_HASH }}|g' | sed 's|<your_public_ip_or_domain>|${{ secrets.WG_HOST }}|g' | sed 's|America/New_York>|${{ secrets.TZ }}|g')
+$(cat .env.example | sed 's|<your_pihole_password_here>|${{ secrets.PIHOLE_WEBPASSWORD }}|g' | sed 's|<your_bcrypt_hash_here>|${{ secrets.WGEASY_PASSWORD_HASH }}|g' | sed 's|<your_public_ip_or_domain>|${{ vars.WG_HOST }}|g' | sed 's|America/New_York|${{ vars.TZ }}|g')
 EOF
           
           # Copy scripts
