@@ -60,7 +60,7 @@ jobs:
           
           # Copy core files
           # Generate docker-compose.yml with environment variables
-          cat > docker-compose.yml << 'EOF_DOCKER_COMPOSE'
+          cat > docker-compose.yml << EOF
 version: '3.7'
 
 services:
@@ -102,7 +102,7 @@ services:
       - net.ipv4.ip_forward=1
       - net.ipv4.conf.all.src_valid_mark=1
     restart: unless-stopped
-EOF_DOCKER_COMPOSE
+EOF
           
           # Generate blocklists.conf
           cat > blocklists.conf << 'EOF_BLOCKLISTS'
@@ -161,3 +161,4 @@ EOF
         ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "
           docker image prune -f --filter 'until=72h'
         "
+
