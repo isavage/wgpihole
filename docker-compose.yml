@@ -1,6 +1,6 @@
 services:
   pihole:
-    image: .pihole/pihole:latest # Official PiHole image
+    image: pihole/pihole:latest # Official PiHole image
     container_name: pihole
     networks:
       wgpihole.net:
@@ -10,9 +10,13 @@ services:
       DNS1: "1.1.1.1"
       DNS2: "1.0.0.1"
       TZ: "${TZ}"
+      WEBTHEME: "default-darker"
     volumes:
       - './etc/pihole:/etc/pihole'
       - './etc/dnsmasq.d:/etc/dnsmasq.d'
+      - './scripts:/scripts:ro'
+      - './blocklists.conf:/blocklists.conf:ro'
+    command: ["/bin/sh", "-c", "/scripts/init-blocklists.sh && /s6-init"]
     expose:
       - "53/tcp"
       - "53/udp"
