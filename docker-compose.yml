@@ -1,0 +1,62 @@
+services:
+  pihole:
+    image: .pihole/pihole:latest
+    container_name: pihole
+    networks:
+      wgpihole.net:
+        ipv4_address: 172.20.0.2
+    environment:
+      WEBPASSWORD: ${PIHOLE_WEBPASSWORD}
+      DNS1: "1.1.1.1"
+      DNS2: "1.0.0.1"
+      TZ: "${TZ}"
+    volumes:
+      - './etc/pihole:/etc/pihole'
+      - './etc/dnsmasq.d:/etc/dnsmasq.d'
+    expose:
+      - "53/tcp"
+      - "53/udp"
+      - "80/tcp"
+    restart: unless-stopped
+
+
+  wgeasy:
+    image: ghcr.io/wg-easy/wg-easy:latest  # Official WG-Easy image
+    container_name: wgeasy  # Explicit container naming
+    networks:
+      wgpihole.net:
+        ipv4_address: 172.20.0.3  # Static IP in Docker network
+    environment:
+      # VPN Configuration
+      WG_HOST: "${WG_HOST}"  # Server's public IP or domain
+      WG_PORT: 51820  # WireGuard UDP port
+      WG_DEFAULT_DNS: "172.20.0.2"  # Pi-hole via network alias
+      WG_DEFAULT_ENDPOINT: "${WG_HOST}:${WG_PORT}"  # Client connection endpoint
+      WG_ALLOWED_IPS: "${WG_ALLOWED_IPS}"  # Full tunnel by default
+      WG_CONFIG: "/etc/wireguard"  # Config storage path
+      WG_PERSISTENT_KEEPALIVE: 25
+      # Web UI Configuration
+      WG_UI: "false"  # Enable web interface
+      WG_UI_PORT: 51821  # Web UI port
+      PASSWORD_HASH: ${WGEASY_PASSWORD_HASH}  # bcrypt hash
+      WG_UI_AUTH: "true"  # Require auth for web UI
+      TZ: "${TZ}"  # Timezone
+    volumes:
+      - './etc/wireguard:/etc/wireguard'  # Persistent VPN config storage
+    ports:
+      - "51820:51820/udp"  # WireGuard VPN port
+      - "51821:51821/tcp"  # Web management interface
+    cap_add:  # Special privileges
+      - NET_ADMIN  # Manage network interfaces
+      - SYS_MODULE  # Load kernel modules
+    sysctls:  # Kernel parameters
+      - net.ipv4.ip_forward=1  # Enable IP routing- net.ipv4.conf.all.src_valid_mark=1  # Required for NAT
+    restart: unless-stopped  # Auto-restart policy
+
+networks:
+  wgpihole.net:
+    name: wgpihole.net
+    driver: bridge  # Isolated network for containers
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24  # Private IP range for container communication
