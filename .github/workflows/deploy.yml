@@ -6,163 +6,80 @@ on:
       force_redeploy:
         description: 'Force redeploy even if no changes'
         required: false
-        default: 'false'
+        default: false
+        type: boolean
+      cleanup:
+        description: 'Clean up persistent direcories before deploying'
+        required: false
+        default: false
         type: boolean
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Setup SSH
-      uses: webfactory/ssh-agent@v0.9.0
-      with:
-        ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
 
-    - name: Check .env file exists
-      id: check_env
-      run: |
-        if ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "test -f /docker/wgpihole/.env"; then
-          echo "env_exists=true" >> $GITHUB_OUTPUT
-        else
-          echo "env_exists=false" >> $GITHUB_OUTPUT
-        fi
+      - name: Create directory structure
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "
+            mkdir -p /docker/wgpihole/{etc/pihole,etc/dnsmasq.d,etc/wireguard,scripts}
+          "
 
-    - name: Handle missing .env file
-      if: steps.check_env.outputs.env_exists == 'false'
-      run: |
-        echo "❌ .env file not found on VPS!"
-        echo "Please create /docker/wgpihole/.env on your VPS with your configuration."
-        echo "Copy .env.example template and fill in your values."
-        exit 1
+      - name: Clean up persistent directories
+        if: ${{ github.event.inputs.cleanup == 'true' }}
+        run: |
+          echo "🧹 Cleaning up persistent directories..."
+          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "
+            cd /docker/wgpihole
+            find . -type f -not -path './etc/pihole/*' \
+                   -not -path './etc/dnsmasq.d/*' \
+                   -not -path './etc/wireguard/*' \
+                   -delete
+          "
 
-    - name: Create directory structure
-      run: |
-        ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "
-          mkdir -p /docker/wgpihole/{etc/pihole,etc/dnsmasq.d,etc/wireguard,scripts}
-        "
+      - name: Transfer files to VPS
+        run: |
+          scp -o StrictHostKeyChecking=no -r \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='.gitignore' \
+            --exclude='.env' \
+            ./* ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/docker/wgpihole/
 
-    - name: Deploy files
-      run: |
-        ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "
-          cd /docker/wgpihole
+      - name: Generate and transfer .env file
+        run: |
+          ENV_CONTENT="TZ=${{ vars.TZ }}
+          WG_HOST=${{ vars.WG_HOST }}
+          WG_ALLOWED_IPS=${{ vars.WG_ALLOWED_IPS }}
+          PIHOLE_WEBPASSWORD=${{ secrets.PIHOLE_WEBPASSWORD }}
+          WGEASY_PASSWORD_HASH=${{ secrets.WGEASY_PASSWORD_HASH }}"
           
-          # Stop existing containers if running
-          if docker-compose ps -q | grep -q .; then
-            echo '🛑 Stopping existing containers...'
-            docker-compose down
-          fi
-          
-          # Copy/overwrite configuration files
-          echo ' Deploying configuration files...'
-          
-          # Copy core files
-          # Generate docker-compose.yml with environment variables
-          cat > docker-compose.yml << EOF
-version: '3.7'
+          echo "$ENV_CONTENT" | ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "cat > /docker/wgpihole/.env"
 
-services:
-  pihole:
-    image: pihole/pihole:latest
-    container_name: pihole
-    environment:
-      - TZ=${{ vars.TZ }}
-      - WEBPASSWORD=${{ secrets.PIHOLE_WEBPASSWORD }}
-      - ServerIP=${{ vars.WG_HOST }}
-    volumes:
-      - './etc/pihole/:/etc/pihole/'
-      - './etc/dnsmasq.d/:/etc/dnsmasq.d/'
-    dns:
-      - 1.1.1.1
-      - 1.0.0.1
-    cap_add:
-      - NET_ADMIN
-    restart: unless-stopped
-
-  wg-easy:
-    image: weejewel/wg-easy:latest
-    container_name: wg-easy
-    environment:
-      - WG_HOST=${{ vars.WG_HOST }}
-      - PASSWORD=${{ secrets.WGEASY_PASSWORD_HASH }}
-      - WG_ALLOWED_IPS=${{ vars.WG_ALLOWED_IPS }}
-      - WG_DEFAULT_ADDRESS=10.8.0.x
-      - WG_DEFAULT_DNS=10.8.0.1
-    volumes:
-      - './etc/wireguard:/etc/wireguard'
-    ports:
-      - "51820:51820/udp"
-      - "51821:51821/tcp"
-    cap_add:
-      - NET_ADMIN
-      - SYS_MODULE
-    sysctls:
-      - net.ipv4.ip_forward=1
-      - net.ipv4.conf.all.src_valid_mark=1
-    restart: unless-stopped
-EOF
-          
-          # Generate blocklists.conf
-          cat > blocklists.conf << 'EOF'
-$(cat blocklists.conf)
-EOF
-          
-          # Generate .env file
-          cat > .env << EOF
-TZ=${{ vars.TZ }}
-WG_HOST=${{ vars.WG_HOST }}
-WG_ALLOWED_IPS=${{ vars.WG_ALLOWED_IPS }}
-PIHOLE_WEBPASSWORD=${{ secrets.PIHOLE_WEBPASSWORD }}
-WGEASY_PASSWORD_HASH=${{ secrets.WGEASY_PASSWORD_HASH }}
-EOF
-          
-          # Copy scripts
-          cat << 'EOF' > scripts/init-blocklists.sh
-$(cat scripts/init-blocklists.sh)
-EOF
-          chmod +x scripts/init-blocklists.sh
-          
-          # Copy README
-          cat << 'EOF' > README.md
-$(cat README.md)
-EOF
-        "
-
-    - name: Start services
-      run: |
-        ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "
-          cd /docker/wgpihole
-          
-          echo '🚀 Starting services...'
-          docker-compose up -d
-          
-          # Wait for services to be ready
-          echo '⏳ Waiting for services to initialize...'
-          sleep 30
-          
-          # Check service status
-          if docker-compose ps | grep -q 'Up'; then
-            echo '✅ Services started successfully!'
-            
-            echo ''
-            echo '📊 Service URLs:'
-            echo "   Pi-hole Admin: http://${{ vars.WG_HOST }}/admin"
-            echo "   WG-Easy Web:  http://${{ vars.WG_HOST }}:51821"
-            echo ''
-            echo '📝 To view logs: docker-compose logs -f'
-            echo '🛑 To stop:      docker-compose down'
-          else
-            echo '❌ Services failed to start!'
-            docker-compose logs
-            exit 1
-          fi
-        "
-
-    - name: Cleanup old images (optional)
-      run: |
-        ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "
-          docker image prune -f --filter 'until=72h'
-        "
-
+      - name: Start services
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} '
+            cd /docker/wgpihole
+            chmod +x scripts/init-blocklists.sh
+            docker-compose down || true
+            docker-compose up -d
+            sleep 30
+            if docker-compose ps | grep -q "Up"; then
+              echo "✅ Services started successfully!"
+              echo ""
+              echo "📊 Service URLs:"
+              echo "   Pi-hole Admin: http://${{ vars.WG_HOST }}/admin"
+              echo "   WG-Easy Web:  http://${{ vars.WG_HOST }}:51821"
+            else
+              echo "❌ Services failed to start!"
+              docker-compose logs
+              exit 1
+            fi
+          '
