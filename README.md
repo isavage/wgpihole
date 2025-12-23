@@ -6,9 +6,11 @@ A Docker Compose setup that combines Pi-hole (DNS ad-blocker) with WG-Easy (Wire
 
 - **Pi-hole**: Network-wide ad blocking with DNS filtering
 - **WG-Easy**: Simple WireGuard VPN management with web interface
+- **Hagezi Blocklists**: Comprehensive ad-blocking with automatic configuration
 - **Isolated Network**: Docker network for secure communication
 - **Persistent Data**: All configurations stored in local volumes
 - **Environment-based Configuration**: No hardcoded secrets
+- **Automated Deployment**: GitHub Actions for VPS deployment
 
 ## Quick Start
 
@@ -50,7 +52,102 @@ Copy `.env.example` to `.env` and configure:
 - `PIHOLE_WEBPASSWORD`: Admin password for Pi-hole web interface
 - `TZ`: Your timezone (e.g., `America/New_York`)
 
-#### Blocklist Management
+#### Hagezi Blocklists Configuration
+Edit `blocklists.conf` to set `true`/`false` for each category:
+
+**Available Categories:**
+- **Core lists**: Ultimate, Pro, Pro+, Light, Multi
+- **Content filtering**: Nosafe, Tracking, FakeNews, Gambling, Porn
+- **Social media**: Social, TikTok, YouTube
+- **Security**: Shortener, Risk, DNS-Rebind
+
+**Example blocklists.conf:**
+```bash
+# Core blocklists (choose one)
+HAGEZI_ULTIMATE=false
+HAGEZI_PRO=true
+HAGEZI_PRO_PLUS=false
+HAGEZI_LIGHT=false
+HAGEZI_MULTI=false
+
+# Additional blocking categories
+HAGEZI_NOSAFE=false
+HAGEZI_TRACKING=true
+HAGEZI_FAKENEWS=false
+HAGEZI_GAMBLING=false
+HAGEZI_PORN=false
+HAGEZI_SOCIAL=false
+HAGEZI_TIKTOK=false
+HAGEZI_YOUTUBE=false
+HAGEZI_SHORTENER=false
+HAGEZI_RISK=false
+HAGEZI_DNS_REBIND=false
+```
+
+#### WG-Easy Configuration
+- `WGEASY_PASSWORD_HASH`: bcrypt hash for VPN web interface
+- `WG_HOST`: Your server's public IP or domain
+- `WG_PORT`: WireGuard UDP port (default: 51820)
+- `WG_ALLOWED_IPS`: Routes to push to clients
+
+#### Network Options for `WG_ALLOWED_IPS`:
+- **Full tunnel**: `0.0.0.0/0` (all traffic through VPN)
+- **DNS only**: `172.20.0.2/32` (only Pi-hole DNS through VPN)
+- **DNS + specific networks**: `172.20.0.2/32,192.168.1.0/24`
+- **Split tunnel**: `10.0.0.0/8,172.16.0.0/12,192.168.0.0/16` (private networks only)
+
+## Deployment
+
+### VPS Deployment
+
+This project supports automated deployment to your VPS via GitHub Actions.
+
+#### Deployment Options
+
+**Option 1: Manual Trigger Only (Current Setup)**
+- **Trigger**: Manual workflow dispatch only
+- **Use case**: Full control over when deployment happens
+- **Workflow**: `deploy.yml` with `workflow_dispatch` only
+- **Pros**: No accidental deployments, predictable timing
+- **Cons**: Requires manual action for every deployment
+
+**Option 2: Release-based (Production)**
+- **Trigger**: Create GitHub release with tag
+- **Use case**: Production deployments, version control
+- **Workflow**: `release.yml`
+- **Pros**: Controlled releases, rollback capability, version tracking
+
+#### Required Secrets
+
+Add these secrets to your GitHub repository (using exact names from .env.example):
+
+1. **`PIHOLE_WEBPASSWORD`**: Pi-hole admin password
+2. **`WGEASY_PASSWORD_HASH`**: bcrypt hash for WG-Easy
+3. **`WG_HOST`**: Your VPS IP address or domain
+4. **`WG_ALLOWED_IPS`**: VPN routing (e.g., `0.0.0.0/0`)
+5. **`TZ`**: Your timezone (e.g., `America/New_York`)
+6. **`VPS_SSH_KEY`**: Your SSH private key for VPS access
+7. **`VPS_USER`**: SSH username (usually `root` or `ubuntu`)
+
+#### Manual Deployment Process
+
+1. Push code changes to GitHub
+2. Go to repository → Actions → "Deploy to VPS"
+3. Click "Run workflow" → Deploy
+
+#### Release Deployment Process
+
+1. Make changes to your code
+2. Commit and push to main branch
+3. Create release on GitHub:
+   - Go to repository → Releases → "Create a new release"
+   - Enter tag version (e.g., `v1.0.0`)
+   - Write release notes
+   - Click "Publish release"
+4. Auto-deployment triggers automatically
+
+### How Blocklists Work
+
 **Blocklists are automatically initialized on first run based on blocklists.conf:**
 
 1. Edit `blocklists.conf` to set `true`/`false` for each category
