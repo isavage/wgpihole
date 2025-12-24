@@ -42,13 +42,21 @@ jobs:
 
       - name: Generate .env file
         run: |
-          cat > /docker/wgpihole/.env <<EOL
-          TZ=${{ vars.TZ }}
-          WG_HOST=${{ vars.WG_HOST }}
-          WG_ALLOWED_IPS=${{ vars.WG_ALLOWED_IPS }}
-          PIHOLE_WEBPASSWORD=${{ secrets.PIHOLE_WEBPASSWORD }}
-          WGEASY_PASSWORD_HASH=${{ secrets.WGEASY_PASSWORD_HASH }}
-          EOL
+          # Create .env file with proper trimming of values
+          # Using printf to control exact output format
+          {
+            printf 'TZ=%s\n' "$(echo -n "${{ vars.TZ }}" | tr -d '\r')"
+            printf 'WG_HOST=%s\n' "$(echo -n "${{ vars.WG_HOST }}" | tr -d '\r')"
+            printf 'WG_ALLOWED_IPS=%s\n' "$(echo -n "${{ vars.WG_ALLOWED_IPS }}" | tr -d '\r')"
+            printf 'PIHOLE_WEBPASSWORD=%s\n' "$(echo -n "${{ secrets.PIHOLE_WEBPASSWORD }}" | tr -d '\r')"
+            printf 'WGEASY_PASSWORD_HASH=%s\n' "$(echo -n "${{ secrets.WGEASY_PASSWORD_HASH }}" | tr -d '\r')"
+          } > /docker/wgpihole/.env
+          
+          echo "Generated .env file:"
+          cat /docker/wgpihole/.env
+          echo ""
+          echo "Checking for hidden characters:"
+          cat /docker/wgpihole/.env | od -c | head -30
 
       - name: Start services
         run: |
@@ -57,6 +65,15 @@ jobs:
           
           # Ensure scripts are executable
           chmod +x scripts/*.sh 2>/dev/null || true
+          
+          # Debug: Show .env and docker-compose config
+          echo "🔍 Debug information:"
+          echo "=== .env file ==="
+          cat .env
+          echo "=== docker-compose config ==="
+          docker compose config
+          echo "=== Checking Pi-hole environment ==="
+          docker compose config | grep -A5 -B5 "WEBPASSWORD" || true
           
           # Start services
           echo "🚀 Starting services..."
@@ -71,6 +88,11 @@ jobs:
             docker compose logs
             exit 1
           fi
+          
+          # Debug: Check container environment
+          echo "=== Container environment check ==="
+          docker compose exec -T pihole printenv WEBPASSWORD 2>/dev/null || echo "Could not check Pi-hole env"
+          docker compose exec -T wgeasy printenv PASSWORD_HASH 2>/dev/null || echo "Could not check WG-Easy env"
           
           echo "✅ Services started successfully!"
           echo ""
