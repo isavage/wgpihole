@@ -22,10 +22,25 @@ jobs:
         run: |
           set -e
           
-          # Create directory structure
-          mkdir -p /docker/wgpihole/{etc/pihole,etc/dnsmasq.d,etc/wireguard,scripts}
+          # Create temporary directory for new files
+          TEMP_DIR=$(mktemp -d)
           
-          # Determine if we should clean up
+          # Create directory structure in temp
+          mkdir -p "$TEMP_DIR"/{etc/pihole,etc/dnsmasq.d,etc/wireguard,scripts}
+          
+          # Copy all files to temp directory first
+          echo "📂 Copying files to temporary location..."
+          find . -mindepth 1 -maxdepth 1 -not -name '.git' -not -name '.github' -not -name '.gitignore' -not -name '.env' -exec cp -r --no-preserve=all --remove-destination {} "$TEMP_DIR"/ \;
+          
+          # Copy docker-compose.yml if it exists
+          if [ -f "docker-compose.yml" ]; then
+            cp --no-preserve=all --remove-destination docker-compose.yml "$TEMP_DIR"/
+          fi
+          
+          # Create target directory structure
+          mkdir -p /docker/wgpihole
+          
+          # If cleanup is requested, remove everything except .env
           if [[ "${{ github.event_name == 'release' || github.event.inputs.cleanup }}" == "true" ]]; then
             echo "🧹 Cleaning up persistent directories..."
             cd /docker/wgpihole
@@ -33,14 +48,9 @@ jobs:
             find . -mindepth 1 -not -path './.env' -delete
           fi
           
-          # Copy files with proper permissions
-          echo "📂 Copying files..."
-          # Copy all files and directories except hidden ones and .env
-          find . -mindepth 1 -maxdepth 1 -not -name '.git' -not -name '.github' -not -name '.gitignore' -not -name '.env' -exec cp -r --no-preserve=all --remove-destination {} /docker/wgpihole/ \;
-          # Explicitly copy docker-compose.yml if it exists
-          if [ -f "docker-compose.yml" ]; then
-            cp --no-preserve=all --remove-destination docker-compose.yml /docker/wgpihole/
-          fi
+          # Move files from temp to target
+          echo "🚚 Moving files to target location..."
+          cp -r "$TEMP_DIR"/. /docker/wgpihole/
           
           # Set secure permissions (suppress errors for container-managed files)
           chmod -R 750 /docker/wgpihole/ 2>/dev/null || true
