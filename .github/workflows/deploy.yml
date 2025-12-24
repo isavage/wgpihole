@@ -113,8 +113,3 @@ jobs:
           
           
           echo "✅ Services started successfully!"
-          echo ""
-          echo "📊 Service URLs:"
-          echo "   Pi-hole Admin: http://$(grep '^WG_HOST=' .env | cut -d '=' -f2- | tr -d '\r\n"'"'")/admin"
-          echo "   WG-Easy Web:  http://$(grep '^WG_HOST=' .env | cut -d '=' -f2- | tr -d '\r\n"\'\"'"):$(grep '^WG_PORT=' .env | cut -d '=' -f2- | tr -d '\r\n"\'\"'")"
-
