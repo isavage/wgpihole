@@ -83,39 +83,6 @@ jobs:
           
           echo "✅ All required variables are present in .env"
 
-      - name: Inject Pi-hole password directly into docker-compose.yml
-        run: |
-          cd /docker/wgpihole
-          
-          # Extract the password value (strip surrounding quotes if present)
-          PIHOLE_PASS=$(grep "^PIHOLE_WEBPASSWORD=" .env | cut -d '=' -f2- | sed 's/^["'"'"']//;s/["'"'"']$//')
-          
-          if [ -z "$PIHOLE_PASS" ]; then
-            echo "❌ Failed to extract PIHOLE_WEBPASSWORD from .env"
-            exit 1
-          fi
-          
-          echo "🔑 Injecting hardcoded WEBPASSWORD into docker-compose.yml..."
-          
-          # Replace the WEBPASSWORD value in docker-compose.yml
-          if grep -q '^\s*WEBPASSWORD\s*:' docker-compose.yml; then
-            # If WEBPASSWORD already exists, update its value
-            sed -i -E "s/^(\s*WEBPASSWORD\s*:).*/\1 \"$PIHOLE_PASS\"/" docker-compose.yml
-          elif grep -q '^\s*environment:' docker-compose.yml; then
-            # If environment section exists but no WEBPASSWORD, add it with proper indentation
-            INDENT=$(grep -m1 '^\s*environment:' docker-compose.yml | sed 's/\(environment:.*$\)//')
-            sed -i "/^\s*environment:/a \\${INDENT}  WEBPASSWORD: \"$PIHOLE_PASS\"" docker-compose.yml
-          else
-            echo "❌ Could not find 'environment:' section in docker-compose.yml"
-            exit 1
-          fi
-          
-          # Optional: Show the updated section for debugging
-          echo "Updated pihole environment section:"
-          grep -A 10 -B 5 "WEBPASSWORD" docker-compose.yml
-          
-          echo "✅ WEBPASSWORD is now hardcoded directly in docker-compose.yml"
-
       - name: Start services
         run: |
           set -e
@@ -141,3 +108,33 @@ jobs:
           
           
           echo "✅ Services started successfully!"
+
+      - name: Set Pi-hole web password from .env
+        run: |
+          set -e
+          cd /docker/wgpihole
+          
+          # Extract the password (strip surrounding quotes if present)
+          PIHOLE_PASS=$(grep "^PIHOLE_WEBPASSWORD=" .env | cut -d '=' -f2- | sed 's/^["'"'"']//;s/["'"'"']$//')
+          
+          if [ -z "$PIHOLE_PASS" ]; then
+            echo "❌ Failed to extract PIHOLE_WEBPASSWORD from .env"
+            exit 1
+          fi
+          
+          echo "🔑 Setting Pi-hole web password..."
+          
+          # Wait for the container and web interface to be ready (with retry)
+          for i in {1..15}; do
+            if docker compose exec pihole pihole setpassword "$PIHOLE_PASS" > /dev/null 2>&1; then
+              echo "✅ Pi-hole web password set successfully!"
+              exit 0
+            fi
+            echo "Attempt $i/15: Pi-hole not ready yet, retrying in 10 seconds..."
+            sleep 10
+          done
+          
+          echo "❌ Failed to set Pi-hole password after multiple attempts."
+          echo "The container may still be initializing. You can manually run:"
+          echo "   docker compose exec pihole pihole setpassword YOUR_PASSWORD"
+          exit 1
