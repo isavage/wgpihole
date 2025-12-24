@@ -50,25 +50,20 @@ jobs:
           printf 'WG_ALLOWED_IPS=%s\n' "${{ vars.WG_ALLOWED_IPS }}" >> .env
           printf 'PIHOLE_WEBPASSWORD=%s\n' "${{ secrets.PIHOLE_WEBPASSWORD }}" >> .env
           
-          # Capture the raw hash
           read -r WGEASY_HASH <<< "${{ secrets.WGEASY_PASSWORD_HASH }}"
           
-          # DEBUG: This will be masked in logs anyway
-          echo "Raw secret length: ${#WGEASY_HASH}"
-          
-          # THIS IS THE CORRECT WAY — use %s and pass the variable safely
+          # Safe write - this preserves all $ exactly
           printf 'WGEASY_PASSWORD_HASH=%s\n' "$WGEASY_HASH" >> .env
           
-          # Optional: verify it worked
+          # Debug checks
           echo "Final .env content:"
           cat .env
           
           if grep -q '^\$2y\$' .env; then
-            echo "✓ Hash starts with \$2y\$ — preserved correctly"
+            echo "✓ Hash preserved correctly (starts with \$2y\$)"
           else
-            echo "✗ Hash is corrupted!"
-            grep WGEASY_PASSWORD_HASH .env
-            grep WGEASY_PASSWORD_HASH .env | od -c  # hex dump for diagnosis
+            echo "✗ Still corrupted"
+            grep WGEASY_PASSWORD_HASH .env | od -c  # detailed byte view
           fi
 
       - name: Start services
