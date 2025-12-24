@@ -11,124 +11,98 @@ on:
 
 jobs:
   deploy:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup environment
-        run: |
-          set -e
-          
-          # Create temporary directory for new files
-          TEMP_DIR=$(mktemp -d)
-          
-          # Create directory structure in temp
-          mkdir -p "$TEMP_DIR"/{etc/pihole,etc/dnsmasq.d,etc/wireguard}
-          
-          # Copy all files to temp directory first
-          echo "📂 Copying files to temporary location..."
-          find . -mindepth 1 -maxdepth 1 -not -name '.git' -not -name '.github' -not -name '.gitignore' -not -name '.env' -exec cp -r --no-preserve=all --remove-destination {} "$TEMP_DIR"/ \;
-          
-          # Copy docker-compose.yml if it exists
-          if [ -f "docker-compose.yml" ]; then
-            cp --no-preserve=all --remove-destination docker-compose.yml "$TEMP_DIR"/
-          fi
-          
-          # Create target directory structure
-          mkdir -p /docker/wgpihole
-          
-          # If cleanup is requested, remove everything except .env
-          if [[ "${{ github.event_name == 'release' || github.event.inputs.cleanup }}" == "true" ]]; then
-            echo "🧹 Cleaning up persistent directories..."
-            cd /docker/wgpihole
-            # Delete everything except .env
-            find . -mindepth 1 -not -path './.env' -delete
-          fi
-          
-          # Move files from temp to target
-          echo "🚚 Moving files to target location..."
-          cp -r "$TEMP_DIR"/. /docker/wgpihole/
-          
-          # Set secure permissions (suppress errors for container-managed files)
-          chmod -R 750 /docker/wgpihole/ 2>/dev/null || true
-          chmod 640 /docker/wgpihole/.env 2>/dev/null || true
-      
-      - name: Verify .env file
-        run: |
-          cd /docker/wgpihole
-          
-          if [ ! -f .env ]; then
-            echo "❌ Error: .env file not found in /docker/wgpihole"
-            echo "Please create the .env file on the VPS with the following required variables:"
-            echo "- TZ"
-            echo "- WG_HOST"
-            echo "- WG_PORT"
-            echo "- WG_ALLOWED_IPS"
-            echo "- PIHOLE_WEBPASSWORD"
-            echo "- WGEASY_PASSWORD_HASH"
-            exit 1
-          fi
-          
-          
-          # Verify required variables are present
-          for var in TZ WG_HOST WG_PORT WG_ALLOWED_IPS PIHOLE_WEBPASSWORD WGEASY_PASSWORD_HASH; do
-            if ! grep -q "^$var=" .env; then
-              echo "❌ Error: Required variable $var is missing from .env"
+      - name: Upload files to temporary directory on VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          source: ".,!.git*,!.github*,!.gitignore,.env"
+          target: "/tmp/wgpihole-deploy-temp/"
+          strip_components: 1
+          overwrite: true
+
+      - name: Cleanup (if needed), move files, and finalize deployment
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          script: |
+            set -e
+
+            TARGET_DIR="/docker/wgpihole"
+            TEMP_DIR="/tmp/wgpihole-deploy-temp"
+
+            # Ensure target exists
+            mkdir -p "$TARGET_DIR"
+            cd "$TARGET_DIR"
+
+            # Optional cleanup: wipe everything except .env
+            if [[ "${{ inputs.cleanup }}" == "true" ]]; then
+              echo "🧹 Cleaning up persistent directories (keeping .env)..."
+              find . -mindepth 1 -not -path './.env' -delete
+            fi
+
+            # Move files from temp to target (fast, atomic-ish)
+            echo "🚚 Moving new files to $TARGET_DIR..."
+            rsync -av --no-perms --no-owner --no-group "$TEMP_DIR"/. ./
+
+            # Clean up temp directory
+            rm -rf "$TEMP_DIR"
+
+            # Set permissions
+            chmod -R 750 . 2>/dev/null || true
+            [ -f .env ] && chmod 640 .env
+
+            # Validate
+            if [ ! -f .env ]; then
+              echo "❌ .env file missing!"
               exit 1
             fi
-          done
-          
-          echo "✅ All required variables are present in .env"
 
-      - name: Start services
-        run: |
-          set -e
-          cd /docker/wgpihole
-          
-          # Start services
-          echo "🚀 Starting services..."
-          docker compose down || true
-          docker compose up -d
-          
-          # Verify services
-          echo "🔍 Verifying services..."
-          sleep 10
-          if ! docker compose ps | grep -q "Up"; then
-            echo "❌ Services failed to start!"
-            docker compose logs
-            exit 1
-          fi
-          
-          
-          echo "✅ Services started successfully!"
-
-      - name: Set Pi-hole web password from .env
-        run: |
-          set -e
-          cd /docker/wgpihole
-          
-          # Extract the password (strip surrounding quotes if present)
-          PIHOLE_PASS=$(grep "^PIHOLE_WEBPASSWORD=" .env | cut -d '=' -f2- | sed 's/^["'"'"']//;s/["'"'"']$//')
-          
-          if [ -z "$PIHOLE_PASS" ]; then
-            echo "❌ Failed to extract PIHOLE_WEBPASSWORD from .env"
-            exit 1
-          fi
-          
-          echo "🔑 Setting Pi-hole web password..."
-          
-          # Wait for the container and web interface to be ready (with retry)
-          for i in {1..15}; do
-            if docker compose exec pihole pihole setpassword "$PIHOLE_PASS" > /dev/null 2>&1; then
-              echo "✅ Pi-hole web password set successfully!"
-              exit 0
+            if [ ! -f docker-compose.yml ]; then
+              echo "❌ docker-compose.yml missing!"
+              exit 1
             fi
-            echo "Attempt $i/15: Pi-hole not ready yet, retrying in 10 seconds..."
+
+            for var in TZ WG_HOST WG_PORT WG_ALLOWED_IPS PIHOLE_WEBPASSWORD WGEASY_PASSWORD_HASH; do
+              grep -q "^$var=" .env || { echo "❌ Missing $var in .env"; exit 1; }
+            done
+            echo "✅ .env validated"
+
+            # Restart services
+            echo "🚀 Restarting services..."
+            docker compose down || true
+            docker compose up -d
+
             sleep 10
-          done
-          
-          echo "❌ Failed to set Pi-hole password after multiple attempts."
-          echo "The container may still be initializing. You can manually run:"
-          echo "   docker compose exec pihole pihole setpassword YOUR_PASSWORD"
-          exit 1
+            if ! docker compose ps | grep -q "Up"; then
+              echo "❌ Services failed to start!"
+              docker compose logs
+              exit 1
+            fi
+            echo "✅ Services running"
+
+            # Set Pi-hole password
+            PIHOLE_PASS=$(grep "^PIHOLE_WEBPASSWORD=" .env | cut -d '=' -f2- | sed 's/^["'"'"']//;s/["'"'"']$//')
+            for i in {1..15}; do
+              if docker compose exec pihole pihole setpassword "$PIHOLE_PASS" > /dev/null 2>&1; then
+                echo "✅ Pi-hole password set successfully"
+                break
+              fi
+              echo "Attempt $i/15: waiting for Pi-hole..."
+              sleep 10
+            done || {
+              echo "❌ Failed to set password after retries"
+              exit 1
+            }
+
+            echo "🎉 Deployment completed successfully!"
