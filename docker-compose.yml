@@ -14,21 +14,8 @@ services:
     volumes:
       - './etc/pihole:/etc/pihole'
       - './etc/dnsmasq.d:/etc/dnsmasq.d'
-      - './scripts:/scripts:ro'
       - './blocklists.conf:/blocklists.conf:ro'
-    entrypoint: ["/bin/bash", "-c"]
-    command:
-      - |
-        # Run custom blocklist initialization ONLY on true first start
-        if [ ! -f /etc/pihole/gravity.db ]; then
-          echo "First-time setup: Running custom blocklist initialization..."
-          /bin/bash /scripts/init-blocklists.sh || echo "⚠️ Init script had issues – continuing anyway"
-        else
-          echo "gravity.db exists – skipping custom blocklist initialization"
-        fi
-
-        # Hand control to the official Pi-hole startup script (correct path for v6+)
-        exec /usr/local/bin/start.sh
+      - './scripts/init-blocklists.sh:/custom-cont-init.d/init-blocklists.sh:ro'  # New: mount your script here
     expose:
       - "53/tcp"
       - "53/udp"
