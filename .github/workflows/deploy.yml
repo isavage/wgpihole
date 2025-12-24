@@ -29,7 +29,8 @@ jobs:
           if [[ "${{ github.event_name == 'release' || github.event.inputs.cleanup }}" == "true" ]]; then
             echo "🧹 Cleaning up persistent directories..."
             cd /docker/wgpihole
-            find . -type f \( -not -path './etc/pihole/*' -and -not -path './etc/dnsmasq.d/*' -and -not -path './etc/wireguard/*' \) -delete
+            # Delete everything except .env
+            find . -mindepth 1 -not -path './.env' -delete
           fi
           
           # Copy files with proper permissions
@@ -67,11 +68,11 @@ jobs:
           
           echo "✅ All required variables are present in .env"
 
-      - name: Replace PIHOLE_WEBPASSWORD with hardcoded value in docker-compose.yml
+      - name: Inject Pi-hole password directly into docker-compose.yml
         run: |
           cd /docker/wgpihole
           
-          # Extract the password value (remove surrounding quotes if present)
+          # Extract the password value (strip surrounding quotes if present)
           PIHOLE_PASS=$(grep "^PIHOLE_WEBPASSWORD=" .env | cut -d '=' -f2- | sed 's/^["'"'"']//;s/["'"'"']$//')
           
           if [ -z "$PIHOLE_PASS" ]; then
@@ -79,12 +80,24 @@ jobs:
             exit 1
           fi
           
-          echo "🔑 Replacing WEBPASSWORD substitution with hardcoded value..."
+          echo "🔑 Injecting hardcoded WEBPASSWORD into docker-compose.yml..."
           
-          # Replace the exact line: WEBPASSWORD: "${PIHOLE_WEBPASSWORD}"
-          # Handles possible spaces around the colon as well
-          sed -i "s|^\s*WEBPASSWORD:\s*\"*\${PIHOLE_WEBPASSWORD}\"*\$|      WEBPASSWORD: \"$PIHOLE_PASS\"|" docker-compose.yml
+          # Step 1: Remove any existing WEBPASSWORD line (any format, any indentation)
+          sed -i '/^\s*WEBPASSWORD[:=]/d' docker-compose.yml
           
+          # Step 2: Find the indentation of the environment: line and insert the new line right after it
+          # This captures the exact leading whitespace of the environment: line
+          if grep -q '^\s*environment:' docker-compose.yml; then
+            INDENT=$(grep -m1 '^\s*environment:' docker-compose.yml | sed 's/\(environment:.*$\)//')
+            sed -i "/^\s*environment:/a ${INDENT}  WEBPASSWORD: \"$PIHOLE_PASS\"" docker-compose.yml
+          else
+            echo "❌ Could not find 'environment:' section in docker-compose.yml"
+            exit 1
+          fi
+          
+          # Optional: Show the updated section for debugging
+          echo "Updated pihole environment section:"
+          grep -A 10 -B 5 "WEBPASSWORD" docker-compose.yml
           
           echo "✅ WEBPASSWORD is now hardcoded directly in docker-compose.yml"
 
