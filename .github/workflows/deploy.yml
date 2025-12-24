@@ -39,43 +39,32 @@ jobs:
           # Set secure permissions (suppress errors for container-managed files)
           chmod -R 750 /docker/wgpihole/ 2>/dev/null || true
           chmod 640 /docker/wgpihole/.env 2>/dev/null || true
-
       - name: Generate .env file
         run: |
           cd /docker/wgpihole
           
-          # Write .env file with proper escaping for the password hash
-          # Using printf to avoid any interpretation of special characters
           printf 'TZ=%s\n' "${{ vars.TZ }}" > .env
           printf 'WG_HOST=%s\n' "${{ vars.WG_HOST }}" >> .env
           printf 'WG_PORT=%s\n' "${{ vars.WG_PORT }}" >> .env
           printf 'WG_ALLOWED_IPS=%s\n' "${{ vars.WG_ALLOWED_IPS }}" >> .env
           printf 'PIHOLE_WEBPASSWORD=%s\n' "${{ secrets.PIHOLE_WEBPASSWORD }}" >> .env
           
-          # Get the raw secret value without any interpretation
-          # Using a here-string to avoid any path expansion or word splitting
           read -r WGEASY_HASH <<< "${{ secrets.WGEASY_PASSWORD_HASH }}"
           
-          # Debug: Show the raw secret value
-          echo "Raw WGEASY_PASSWORD_HASH value: $WGEASY_HASH"
+          echo "Raw WGEASY_PASSWORD_HASH value: $WGEASY_HASH"  # Still safe for debug (masked in logs)
           
-          # Write the hash directly to the .env file
-          echo "WGEASY_PASSWORD_HASH='$WGEASY_HASH'" >> .env
+          # Fixed line:
+          printf 'WGEASY_PASSWORD_HASH=%s\n' "$WGEASY_HASH" >> .env
           
-          # Debug: Show the final .env content
           echo "Final .env content:"
           cat .env
           
-          echo "Generated .env file contents:"
-          cat .env
-          echo ""
-          echo "Debug - checking for $ issues:"
+          # Your existing check (should now pass)
           if grep -q '\$2' .env; then
             echo "✓ .env contains \$2 (good - bcrypt hash preserved)"
           else
             echo "✗ .env does NOT contain \$2 (hash may be corrupted)"
-            echo "Hex dump of WGEASY line:"
-            grep WGEASY_PASSWORD_HASH .env | od -c | head -5
+            grep WGEASY_PASSWORD_HASH .env | od -c
           fi
 
       - name: Start services
