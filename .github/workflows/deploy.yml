@@ -52,8 +52,14 @@ jobs:
           printf 'WG_ALLOWED_IPS=%s\n' "${{ vars.WG_ALLOWED_IPS }}" >> .env
           printf 'PIHOLE_WEBPASSWORD=%s\n' "${{ secrets.PIHOLE_WEBPASSWORD }}" >> .env
           
-          # Get the password hash directly from the secret
-          WGEASY_HASH=$(echo "${{ secrets.WGEASY_PASSWORD_HASH }}" | tr -d '\n')
+          # Get the raw secret value without any interpretation
+          # Using a here-string to avoid any path expansion or word splitting
+          read -r WGEASY_HASH <<< "${{ secrets.WGEASY_PASSWORD_HASH }}"
+          
+          # Debug: Show the raw secret value
+          echo "Raw WGEASY_PASSWORD_HASH value: $WGEASY_HASH"
+          
+          # Write the hash directly to the .env file
           echo "WGEASY_PASSWORD_HASH='$WGEASY_HASH'" >> .env
           
           # Debug: Show the final .env content
