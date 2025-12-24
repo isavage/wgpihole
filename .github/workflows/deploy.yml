@@ -75,14 +75,6 @@ jobs:
           # Ensure scripts are executable
           chmod +x scripts/*.sh 2>/dev/null || true
           
-          # Debug: Show .env and docker-compose config
-          echo "🔍 Debug information:"
-          echo "=== .env file ==="
-          cat .env
-          echo "=== docker-compose config ==="
-          docker compose config
-          echo "=== Checking Pi-hole environment ==="
-          docker compose config | grep -A5 -B5 "WEBPASSWORD" || true
           
           # Start services
           echo "🚀 Starting services..."
@@ -98,10 +90,6 @@ jobs:
             exit 1
           fi
           
-          # Debug: Check container environment
-          echo "=== Container environment check ==="
-          docker compose exec -T pihole printenv WEBPASSWORD 2>/dev/null || echo "Could not check Pi-hole env"
-          docker compose exec -T wgeasy printenv PASSWORD_HASH 2>/dev/null || echo "Could not check WG-Easy env"
           
           echo "✅ Services started successfully!"
           echo ""
