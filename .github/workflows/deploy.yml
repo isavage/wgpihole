@@ -42,21 +42,34 @@ jobs:
 
       - name: Generate .env file
         run: |
-          # Create .env file with proper trimming of values
-          # Using printf to control exact output format
-          {
-            printf 'TZ=%s\n' "$(echo -n "${{ vars.TZ }}" | tr -d '\r')"
-            printf 'WG_HOST=%s\n' "$(echo -n "${{ vars.WG_HOST }}" | tr -d '\r')"
-            printf 'WG_ALLOWED_IPS=%s\n' "$(echo -n "${{ vars.WG_ALLOWED_IPS }}" | tr -d '\r')"
-            printf 'PIHOLE_WEBPASSWORD=%s\n' "$(echo -n "${{ secrets.PIHOLE_WEBPASSWORD }}" | tr -d '\r')"
-            printf 'WGEASY_PASSWORD_HASH=%s\n' "$(echo -n "${{ secrets.WGEASY_PASSWORD_HASH }}" | tr -d '\r')"
-          } > /docker/wgpihole/.env
+          cd /docker/wgpihole
           
-          echo "Generated .env file:"
-          cat /docker/wgpihole/.env
+          # Write .env file with proper escaping to prevent $ expansion
+          # Using awk to write file without shell interpreting $
+          awk -v tz="${{ vars.TZ }}" \
+              -v host="${{ vars.WG_HOST }}" \
+              -v ips="${{ vars.WG_ALLOWED_IPS }}" \
+              -v pihole_pw="${{ secrets.PIHOLE_WEBPASSWORD }}" \
+              -v wg_hash="${{ secrets.WGEASY_PASSWORD_HASH }}" \
+              'BEGIN {
+                print "TZ=" tz
+                print "WG_HOST=" host
+                print "WG_ALLOWED_IPS=" ips
+                print "PIHOLE_WEBPASSWORD=" pihole_pw
+                print "WGEASY_PASSWORD_HASH=" wg_hash
+              }' > .env
+          
+          echo "Generated .env file contents:"
+          cat .env
           echo ""
-          echo "Checking for hidden characters:"
-          cat /docker/wgpihole/.env | od -c | head -30
+          echo "Debug - checking for $ issues:"
+          if grep -q '\$2' .env; then
+            echo "✓ .env contains \$2 (good - bcrypt hash preserved)"
+          else
+            echo "✗ .env does NOT contain \$2 (hash may be corrupted)"
+            echo "Hex dump of WGEASY line:"
+            grep WGEASY_PASSWORD_HASH .env | od -c | head -5
+          fi
 
       - name: Start services
         run: |
