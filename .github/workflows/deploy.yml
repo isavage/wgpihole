@@ -56,10 +56,6 @@ jobs:
             exit 1
           fi
           
-          echo "✅ Found existing .env file"
-          echo "=== .env file content ==="
-          cat .env
-          echo "========================="
           
           # Verify required variables are present
           for var in TZ WG_HOST WG_PORT WG_ALLOWED_IPS PIHOLE_WEBPASSWORD WGEASY_PASSWORD_HASH; do
