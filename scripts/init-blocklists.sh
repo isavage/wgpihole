@@ -1,5 +1,5 @@
 #!/bin/bash
-
+set -euo pipefail
 # Init script that runs only when gravity.db doesn't exist
 # This runs inside the Pi-hole container on startup
 
