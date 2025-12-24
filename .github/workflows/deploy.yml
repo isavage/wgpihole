@@ -16,19 +16,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Copy files to VPS
+      - name: Upload files to temporary directory on VPS
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: 22
-          source: ".,!.git*,!.github*,!.gitignore,.env"  # include all, exclude unwanted (note: .env excluded to be safe)
-          target: "/docker/wgpihole/"
+          source: ".,!.git*,!.github*,!.gitignore,.env"
+          target: "/tmp/wgpihole-deploy-temp/"
           strip_components: 1
           overwrite: true
 
-      - name: Restart services and finalize on VPS
+      - name: Cleanup (if needed), move files, and finalize deployment
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -37,21 +37,39 @@ jobs:
           port: 22
           script: |
             set -e
-            cd /docker/wgpihole
 
-            # Optional cleanup (keep .env)
+            TARGET_DIR="/docker/wgpihole"
+            TEMP_DIR="/tmp/wgpihole-deploy-temp"
+
+            # Ensure target exists
+            mkdir -p "$TARGET_DIR"
+            cd "$TARGET_DIR"
+
+            # Optional cleanup: wipe everything except .env
             if [[ "${{ inputs.cleanup }}" == "true" ]]; then
               echo "🧹 Cleaning up persistent directories (keeping .env)..."
               find . -mindepth 1 -not -path './.env' -delete
             fi
 
+            # Move files from temp to target (fast, atomic-ish)
+            echo "🚚 Moving new files to $TARGET_DIR..."
+            rsync -av --no-perms --no-owner --no-group "$TEMP_DIR"/. ./
+
+            # Clean up temp directory
+            rm -rf "$TEMP_DIR"
+
             # Set permissions
             chmod -R 750 . 2>/dev/null || true
             [ -f .env ] && chmod 640 .env
 
-            # Validate .env
+            # Validate
             if [ ! -f .env ]; then
               echo "❌ .env file missing!"
+              exit 1
+            fi
+
+            if [ ! -f docker-compose.yml ]; then
+              echo "❌ docker-compose.yml missing!"
               exit 1
             fi
 
@@ -84,7 +102,6 @@ jobs:
               sleep 10
             done || {
               echo "❌ Failed to set password after retries"
-              echo "Run manually: docker compose exec pihole pihole setpassword YOUR_PASSWORD"
               exit 1
             }
 
