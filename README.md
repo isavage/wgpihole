@@ -19,29 +19,23 @@ A secure, production-ready Docker Compose setup combining Pi-hole (DNS ad-blocke
 - Ports 53 (TCP/UDP), 80 (TCP), and 51820 (UDP) open in your firewall
 - Domain name pointing to your VPS (recommended)
 
-### Deployment Steps
+### Quick Start
 
-**Option 1: GitHub Actions Deployment (Recommended)**
+**For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md)**
+
+**Quick deployment:**
 1. Fork this repository
 2. Configure GitHub secrets (see DEPLOYMENT.md)
 3. Trigger deployment from GitHub Actions
-4. Access services at the provided URLs
 
-**Option 2: Manual Deployment**
-1. Clone the repository:
-   ```bash
-   git clone <repository-url>
-   cd wgpihole
-   ```
-2. Create and configure .env file:
-   ```bash
-   cp .env.example .env
-   nano .env  # Update with your settings
-   ```
-3. Start the services:
-   ```bash
-   docker compose up -d
-   ```
+**Manual deployment:**
+```bash
+git clone <repository-url>
+cd wgpihole
+cp .env.example .env
+nano .env  # Update with your settings
+docker compose up -d
+```
 
 ### Access Services
 - Pi-hole Admin: `http://<your-vps-ip>/admin`
@@ -83,214 +77,47 @@ The file contains URLs to various blocklist sources that will be automatically l
 - **DNS + specific networks**: `172.20.0.2/32,192.168.1.0/24`
 - **Split tunnel**: `10.0.0.0/8,172.16.0.0/12,192.168.0.0/16` (private networks only)
 
-## Deployment
-
-### VPS Deployment
-
-This project supports automated deployment to your VPS via GitHub Actions.
-
-#### Deployment Options
-
-**Option 1: Manual Trigger Only (Current Setup)**
-- **Trigger**: Manual workflow dispatch only
-- **Use case**: Full control over when deployment happens
-- **Workflow**: `deploy.yml` with `workflow_dispatch` only
-- **Pros**: No accidental deployments, predictable timing
-- **Cons**: Requires manual action for every deployment
-
-**Option 2: Release-based (Production)**
-- **Trigger**: Create GitHub release with tag
-- **Use case**: Production deployments, version control
-- **Workflow**: `release.yml`
-- **Pros**: Controlled releases, rollback capability, version tracking
-
-#### Required Secrets
-
-Add these secrets to your GitHub repository (using exact names from .env.example):
-
-1. **`PIHOLE_WEBPASSWORD`**: Pi-hole admin password
-2. **`WGEASY_PASSWORD_HASH`**: bcrypt hash for WG-Easy
-3. **`WG_HOST`**: Your VPS IP address or domain
-4. **`WG_ALLOWED_IPS`**: VPN routing (e.g., `0.0.0.0/0`)
-5. **`TZ`**: Your timezone (e.g., `America/New_York`)
-6. **`VPS_SSH_KEY`**: Your SSH private key for VPS access
-7. **`VPS_USER`**: SSH username (usually `root` or `ubuntu`)
-
-#### Manual Deployment Process
-
-1. Push code changes to GitHub
-2. Go to repository → Actions → "Deploy to VPS"
-3. Click "Run workflow" → Deploy
-
-#### Release Deployment Process
-
-1. Make changes to your code
-2. Commit and push to main branch
-3. Create release on GitHub:
-   - Go to repository → Releases → "Create a new release"
-   - Enter tag version (e.g., `v1.0.0`)
-   - Write release notes
-   - Click "Publish release"
-4. Auto-deployment triggers automatically
-
-### How Blocklists Work
-
-**Blocklists are automatically initialized on first run based on blocklists.conf:**
-
-1. Edit `blocklists.conf` to set `true`/`false` for each category
-2. Run `docker-compose up -d`
-3. On first run: Database is created with your selected blocklists
-4. On subsequent runs: Existing database is used (preserves your settings)
-
-**Available Categories in blocklists.conf:**
-- **Core lists**: Ultimate, Pro, Pro+, Light, Multi
-- **Content filtering**: Nosafe, Tracking, FakeNews, Gambling, Porn
-- **Social media**: Social, TikTok, YouTube
-- **Security**: Shortener, Risk, DNS-Rebind
-
-**How it works:**
-- Container runs `init-blocklists.sh` on startup
-- Script only runs if `gravity.db` doesn't exist
-- Enabled lists are added to database, disabled lists are added but inactive
-- Pi-hole reads database and loads only enabled lists
-- Database persists across container restarts
-
-#### WG-Easy Configuration
-- `WGEASY_PASSWORD_HASH`: bcrypt hash for VPN web interface
-- `WG_HOST`: Your server's public IP or domain
-- `WG_PORT`: WireGuard UDP port (default: 51820)
-- `WG_ALLOWED_IPS`: Routes to push to clients
-
-#### Network Options for `WG_ALLOWED_IPS`:
-- **Full tunnel**: `0.0.0.0/0` (all traffic through VPN)
-- **DNS only**: `172.20.0.2/32` (only Pi-hole DNS through VPN)
-- **Split tunnel**: `10.0.0.0/8,172.16.0.0/12,192.168.0.0/16` (private networks only)
-- **Custom**: Comma-separated list of networks
-
-### Generate WG-Easy Password Hash
-
-```bash
-# Generate bcrypt hash (replace 'your_password' with your desired password)
-htpasswd -nb -B admin your_password | cut -d: -f2
-```
-
-## Services
-
-### Pi-hole
-- **Web Interface**: http://your-server-ip/admin
-- **DNS Ports**: 53/tcp, 53/udp (internal only)
-- **Admin Password**: Set via `PIHOLE_WEBPASSWORD`
-
-### WG-Easy
-- **Web Interface**: http://your-server-ip:51821
-- **VPN Port**: 51820/udp
-- **Admin Password**: Set via `WGEASY_PASSWORD_HASH`
-
-## Network Architecture
-
-```
-Internet → WG-Easy (172.20.0.3:51820) → Pi-hole (172.20.0.2:53) → Clean DNS
-```
-
-- `172.20.0.2`: Pi-hole DNS server
-- `172.20.0.3`: WG-Easy VPN server
-- Docker network: `wgpihole.net`
-
-## Data Persistence
-
-Configuration data is stored in local directories:
-- `./etc/pihole/`: Pi-hole configuration and blocklists
-- `./etc/dnsmasq.d/`: Custom DNS settings
-- `./etc/wireguard/`: WireGuard client configurations
-
-## Usage Examples
-
-### DNS-Only VPN Setup
-For ad-blocking without routing all traffic:
-```bash
-# In .env
-WG_ALLOWED_IPS=172.20.0.2/32
-```
-
-### Full Tunnel Setup
-Route all internet traffic through VPN:
-```bash
-# In .env
-WG_ALLOWED_IPS=0.0.0.0/0
-```
-
-### Split Tunnel Setup
-Route only private networks through VPN:
-```bash
-# In .env
-WG_ALLOWED_IPS=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
-```
-
-## Management
-
-### Start Services
-```bash
-docker-compose up -d
-```
-
-### Stop Services
-```bash
-docker-compose down
-```
-
-### View Logs
-```bash
-docker-compose logs -f
-```
-
-### Update Services
-```bash
-docker-compose pull
-docker-compose up -d
-```
-
-## Security Notes
-
-- All passwords are stored in environment variables (not in Docker Compose)
-- `.env` file is excluded from version control via `.gitignore`
-- Use strong, unique passwords for both services
-- Consider using GitHub Secrets for CI/CD deployments
-
 ## Troubleshooting
 
 ### Common Issues
 
-1. **VPN clients can't resolve DNS**
-   - Ensure `WG_DEFAULT_DNS` points to `172.20.0.2`
-   - Check Pi-hole is running: `docker-compose ps`
+**Services won't start:**
+- Check that ports 53, 80, and 51820 are open
+- Verify Docker is running on the VPS
+- Check the deployment logs in GitHub Actions
 
-2. **Can't access web interfaces**
-   - Verify ports are not blocked by firewall
-   - Check containers are running: `docker-compose ps`
+**Can't access Pi-hole admin:**
+- Wait a few minutes for services to fully start
+- The password is automatically set from your `.env` file
+- Try accessing via `http://<your-vps-ip>/admin`
 
-3. **Configuration not persisting**
-   - Ensure volume mounts are correctly configured
-   - Check permissions on local directories
+**VPN connection issues:**
+- Ensure port 51820/UDP is open in your firewall
+- Check that `WG_HOST` is set to your VPS public IP
+- Download a new client config from WG-Easy web UI
 
-### Reset Configuration
+### Logs and Debugging
+
 ```bash
-# Stop services
-docker-compose down
+# Check container status
+docker compose ps
 
-# Remove configuration directories (WARNING: This deletes all settings!)
-rm -rf ./etc/pihole ./etc/dnsmasq.d ./etc/wireguard
+# View logs
+docker compose logs pihole
+docker compose logs wgeasy
 
-# Restart with fresh configuration
-docker-compose up -d
+# Restart services
+docker compose restart
 ```
-
-## License
-
-This project is provided as-is for educational and personal use.
 
 ## Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Submit a pull request
+4. Test thoroughly
+5. Submit a pull request
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
