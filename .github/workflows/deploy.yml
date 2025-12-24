@@ -67,6 +67,27 @@ jobs:
           
           echo "✅ All required variables are present in .env"
 
+      - name: Replace PIHOLE_WEBPASSWORD with hardcoded value in docker-compose.yml
+        run: |
+          cd /docker/wgpihole
+          
+          # Extract the password value (remove surrounding quotes if present)
+          PIHOLE_PASS=$(grep "^PIHOLE_WEBPASSWORD=" .env | cut -d '=' -f2- | sed 's/^["'"'"']//;s/["'"'"']$//')
+          
+          if [ -z "$PIHOLE_PASS" ]; then
+            echo "❌ Failed to extract PIHOLE_WEBPASSWORD from .env"
+            exit 1
+          fi
+          
+          echo "🔑 Replacing WEBPASSWORD substitution with hardcoded value..."
+          
+          # Replace the exact line: WEBPASSWORD: "${PIHOLE_WEBPASSWORD}"
+          # Handles possible spaces around the colon as well
+          sed -i "s|^\s*WEBPASSWORD:\s*\"*\${PIHOLE_WEBPASSWORD}\"*\$|      WEBPASSWORD: \"$PIHOLE_PASS\"|" docker-compose.yml
+          
+          
+          echo "✅ WEBPASSWORD is now hardcoded directly in docker-compose.yml"
+
       - name: Start services
         run: |
           set -e
