@@ -44,20 +44,18 @@ jobs:
         run: |
           cd /docker/wgpihole
           
-          # Write .env file with proper escaping to prevent $ expansion
-          # Using awk to write file without shell interpreting $
-          awk -v tz="${{ vars.TZ }}" \
-              -v host="${{ vars.WG_HOST }}" \
-              -v ips="${{ vars.WG_ALLOWED_IPS }}" \
-              -v pihole_pw="${{ secrets.PIHOLE_WEBPASSWORD }}" \
-              -v wg_hash="${{ secrets.WGEASY_PASSWORD_HASH }}" \
-              'BEGIN {
-                print "TZ=" tz
-                print "WG_HOST=" host
-                print "WG_ALLOWED_IPS=" ips
-                print "PIHOLE_WEBPASSWORD=" pihole_pw
-                print "WGEASY_PASSWORD_HASH=" wg_hash
-              }' > .env
+          # Write .env file with a here-document to prevent any variable expansion
+          cat > .env << 'EOF'
+          TZ=${{ vars.TZ }}
+          WG_HOST=${{ vars.WG_HOST }}
+          WG_ALLOWED_IPS=${{ vars.WG_ALLOWED_IPS }}
+          PIHOLE_WEBPASSWORD=${{ secrets.PIHOLE_WEBPASSWORD }}
+          WGEASY_PASSWORD_HASH=${{ secrets.WGEASY_PASSWORD_HASH }}
+          EOF
+          
+          # Debug: Show the final .env content
+          echo "Final .env content:"
+          cat .env
           
           echo "Generated .env file contents:"
           cat .env
