@@ -48,6 +48,7 @@ jobs:
           cat > .env << 'EOF'
           TZ=${{ vars.TZ }}
           WG_HOST=${{ vars.WG_HOST }}
+          WG_PORT=${{ vars.WG_PORT }}
           WG_ALLOWED_IPS=${{ vars.WG_ALLOWED_IPS }}
           PIHOLE_WEBPASSWORD=${{ secrets.PIHOLE_WEBPASSWORD }}
           WGEASY_PASSWORD_HASH=${{ secrets.WGEASY_PASSWORD_HASH }}
