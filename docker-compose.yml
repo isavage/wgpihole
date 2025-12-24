@@ -15,7 +15,7 @@ services:
       - './etc/pihole:/etc/pihole'
       - './etc/dnsmasq.d:/etc/dnsmasq.d'
       - './blocklists.conf:/blocklists.conf:ro'
-      - './scripts/init-blocklists.sh:/custom-cont-init.d/init-blocklists.sh:ro'  # New: mount your script here
+      - './adlists.custom:/etc/pihole/adlists.list:ro' # custom adlists
     expose:
       - "53/tcp"
       - "53/udp"
