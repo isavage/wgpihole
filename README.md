@@ -23,12 +23,7 @@ A secure, production-ready Docker Compose setup combining Pi-hole (DNS ad-blocke
 
 **For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md)**
 
-**Quick deployment:**
-1. Fork this repository
-2. Configure GitHub secrets (see DEPLOYMENT.md)
-3. Trigger deployment from GitHub Actions
-
-**Manual deployment:**
+**Manual deployment (recommended):**
 ```bash
 git clone <repository-url>
 cd wgpihole
@@ -37,13 +32,19 @@ nano .env  # Update with your settings
 docker compose up -d
 ```
 
+**GitHub Actions deployment:**
+1. Fork this repository
+2. Follow the setup instructions in [DEPLOYMENT.md](DEPLOYMENT.md)
+3. Trigger deployment from GitHub Actions
+
 ### Access Services
 - Pi-hole Admin: `http://<your-vps-ip>/admin`
 - WG-Easy Web UI: `http://<your-vps-ip>:51821`
 
 ### First-Time Setup
-   - The deployment will automatically set your Pi-hole admin password from the `.env` file
+   - The Pi-hole admin password is set from the `PIHOLE_WEBPASSWORD` variable in your `.env` file
    - WireGuard client configurations can be downloaded from the WG-Easy web interface
+   - Allow a few minutes for services to fully initialize on first startup
 
 ## Configuration
 
@@ -84,7 +85,7 @@ The file contains URLs to various blocklist sources that will be automatically l
 **Services won't start:**
 - Check that ports 53, 80, and 51820 are open
 - Verify Docker is running on the VPS
-- Check the deployment logs in GitHub Actions
+- Check container logs: `docker compose logs`
 
 **Can't access Pi-hole admin:**
 - Wait a few minutes for services to fully start

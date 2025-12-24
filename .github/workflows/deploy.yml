@@ -8,8 +8,6 @@ on:
         required: false
         type: boolean
         default: false
-  release:
-    types: [published]
 
 jobs:
   deploy:
@@ -26,7 +24,7 @@ jobs:
           TEMP_DIR=$(mktemp -d)
           
           # Create directory structure in temp
-          mkdir -p "$TEMP_DIR"/{etc/pihole,etc/dnsmasq.d,etc/wireguard,scripts}
+          mkdir -p "$TEMP_DIR"/{etc/pihole,etc/dnsmasq.d,etc/wireguard}
           
           # Copy all files to temp directory first
           echo "📂 Copying files to temporary location..."
@@ -87,10 +85,6 @@ jobs:
         run: |
           set -e
           cd /docker/wgpihole
-          
-          # Ensure scripts are executable
-          chmod +x scripts/*.sh 2>/dev/null || true
-          
           
           # Start services
           echo "🚀 Starting services..."

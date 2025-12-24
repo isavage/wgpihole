@@ -3,17 +3,17 @@
 ## Deployment Overview
 
 This project uses GitHub Actions for automated VPS deployment with the following features:
-- **Zero-downtime** deployments
+- **Manual deployment** with workflow trigger
 - **Automatic password management** for Pi-hole
 - **Persistent configuration** using `.env` file
-- **Clean rollback** capability
-- **Self-healing** service management
+- **Clean deployment** with proper file handling
+- **Service verification** after deployment
 
 ### Deployment
 
 #### Manual Deployment
 - **Trigger**: Manual workflow dispatch
-- **Workflow**: [.github/workflows/deploy.yml](cci:7://file:///Users/varunsharma/unix/vscode/wgpihole/.github/workflows/deploy.yml:0:0-0:0)
+- **Workflow**: `.github/workflows/deploy.yml`
 - **Best for**: All environments
 - **Process**:
   1. Push changes to your repository
@@ -45,52 +45,31 @@ This project uses GitHub Actions for automated VPS deployment with the following
    - Optionally enable cleanup of previous deployment
    - Monitor the deployment logs
 
-### Required Secrets
+### Required Environment Variables
 
-Add these secrets to your GitHub repository (using exact names from .env.example):
+Create a `.env` file on your VPS at `/docker/wgpihole/.env` with the following variables:
 
 1. **`PIHOLE_WEBPASSWORD`**: Pi-hole admin password
 2. **`WGEASY_PASSWORD_HASH`**: bcrypt hash for WG-Easy
 3. **`WG_HOST`**: Your VPS IP address or domain
-4. **`WG_ALLOWED_IPS`**: VPN routing (e.g., `0.0.0.0/0`)
-5. **`TZ`**: Your timezone (e.g., `America/New_York`)
-6. **`VPS_SSH_KEY`**: Your SSH private key for VPS access
-7. **`VPS_USER`**: SSH username (usually `root` or `ubuntu`)
+4. **`WG_PORT`**: WireGuard UDP port (default: 51820)
+5. **`WG_ALLOWED_IPS`**: VPN routing (e.g., `0.0.0.0/0`)
+6. **`TZ`**: Your timezone (e.g., `America/New_York`)
 
-### Deployment Control Strategies
+### Required GitHub Secrets
 
-#### Option 1: Branch Protection (Recommended)
-- **Main branch**: Protected - Requires PR review
-- **Development branch**: `develop` - Push triggers deployment
-- **Production**: Merge to `main` → Create release → Deploy
+Only one secret is required for GitHub Actions deployment:
 
-#### Option 2: Manual Trigger Only
-- **Disable push triggers** in workflow
-- **Only manual deployment** via workflow_dispatch
-- **Full control** - Deploy only when explicitly requested
+1. **`VPS_SSH_KEY`**: Your SSH private key for VPS access
 
-#### Option 3: Tag-based Deployment
-- **Current setup**: Push to main deploys, tags create releases
-- **Alternative**: Only deploy on tags (set `branches: []`)
-- **Clean separation**: Development pushes don't trigger deployment
-
-#### Option 4: Environment-based
-- **Development**: Push to `develop` → Deploy to staging
-- **Production**: Push to `main` → Deploy to production
-- **Requires**: Separate workflow files or environment variables
-
-### Recommended Setup
-
-1. **Protected main branch** - Require PR for production changes
-2. **Development workflow** - `develop` branch deploys to staging
-3. **Release workflow** - Tags deploy to production
-4. **Manual override** - `workflow_dispatch` for emergency deployments
+**Note**: The workflow expects the `.env` file to already exist on the VPS. It will verify its presence and use the values from there, not from GitHub secrets.
 
 ### Current Configuration
 
-**Current setup**: Push to main + manual trigger
-- **Pros**: Simple, flexible
-- **Cons**: Every push deploys (may be too frequent)
+**Current setup**: Manual trigger only
+- **Trigger**: Manual workflow dispatch from GitHub Actions
+- **Pros**: Full control over when deployments happen
+- **Cons**: Requires manual action for each deployment
 
 ### Deployment Strategy
 
@@ -100,10 +79,7 @@ Add these secrets to your GitHub repository (using exact names from .env.example
 - Handles configuration changes properly
 - Minimal downtime (~30 seconds)
 
-**Alternative: Rolling Update**
-- Starts new containers while old ones run
-- Zero downtime but more complex
-- Not implemented by default
+
 
 ### How It Works
 
@@ -143,7 +119,7 @@ docker-compose up -d
 1. **Docker installed**
 2. **Docker Compose installed**
 3. **SSH access configured**
-4. **Ports 51820/udp and 51821/tcp open**
+4. **Ports 53 (TCP/UDP), 80 (TCP), and 51820 (UDP) open**
 
 ### Troubleshooting
 
