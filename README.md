@@ -61,37 +61,15 @@ Copy `.env.example` to `.env` and configure:
 - `PIHOLE_WEBPASSWORD`: Admin password for Pi-hole web interface
 - `TZ`: Your timezone (e.g., `America/New_York`)
 
-#### Hagezi Blocklists Configuration
-Edit `blocklists.conf` to set `true`/`false` for each category:
+#### Blocklists Configuration
+The project uses `adblock.list` for custom blocklists. You can edit this file to add or remove blocklist sources:
 
-**Available Categories:**
-- **Core lists**: Ultimate, Pro, Pro+, Light, Multi
-- **Content filtering**: Nosafe, Tracking, FakeNews, Gambling, Porn
-- **Social media**: Social, TikTok, YouTube
-- **Security**: Shortener, Risk, DNS-Rebind
-
-**Example blocklists.conf:**
 ```bash
-# Core blocklists (choose one)
-HAGEZI_ULTIMATE=false
-HAGEZI_PRO=true
-HAGEZI_PRO_PLUS=false
-HAGEZI_LIGHT=false
-HAGEZI_MULTI=false
-
-# Additional blocking categories
-HAGEZI_NOSAFE=false
-HAGEZI_TRACKING=true
-HAGEZI_FAKENEWS=false
-HAGEZI_GAMBLING=false
-HAGEZI_PORN=false
-HAGEZI_SOCIAL=false
-HAGEZI_TIKTOK=false
-HAGEZI_YOUTUBE=false
-HAGEZI_SHORTENER=false
-HAGEZI_RISK=false
-HAGEZI_DNS_REBIND=false
+# Edit the blocklists file
+nano adblock.list
 ```
+
+The file contains URLs to various blocklist sources that will be automatically loaded by Pi-hole.
 
 #### WG-Easy Configuration
 - `WGEASY_PASSWORD_HASH`: bcrypt hash for VPN web interface
