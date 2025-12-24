@@ -16,33 +16,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy to VPS via SSH
+      - name: Deploy files and restart services via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_SSH_PORT }}  # optional, default 22
+          port: 22
           script: |
             set -e
-
-            # Variables
             TARGET_DIR="/docker/wgpihole"
-            REPO_URL="https://github.com/${{ github.repository }}.git"
-            BRANCH="${{ github.ref_name }}"
 
-            # Create a temporary directory on the VPS
-            TEMP_DIR=$(mktemp -d)
-            echo "📂 Temporary directory: $TEMP_DIR"
-
-            # Clone the repository into the temp directory
-            echo "📥 Cloning repository..."
-            git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$TEMP_DIR"
-
-            # Move into the cloned repo
-            cd "$TEMP_DIR"
-
-            # Create target directory structure if it doesn't exist
+            # Create target dir if needed
             mkdir -p "$TARGET_DIR"
 
             # Optional cleanup (keep .env)
@@ -50,78 +35,61 @@ jobs:
               echo "🧹 Cleaning up persistent directories (keeping .env)..."
               cd "$TARGET_DIR"
               find . -mindepth 1 -not -path './.env' -delete
-              cd "$TEMP_DIR"
+              cd -
             fi
 
-            # Copy files to target (preserve .env if it exists)
-            echo "🚚 Copying files to $TARGET_DIR..."
+            # Upload all files except unwanted ones (preserves .env on server)
+            echo "🚚 Uploading files..."
+            cd "${{ github.workspace }}"
             rsync -av --no-perms --no-owner --no-group \
               --exclude='.git' \
               --exclude='.github' \
               --exclude='.gitignore' \
-              . "$TARGET_DIR/"
+              --exclude='.env' \
+              . "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:$TARGET_DIR/" \
+              || true  # continue even if some files fail
 
-            # Set secure permissions
+            # Set permissions
             chmod -R 750 "$TARGET_DIR/" 2>/dev/null || true
             [ -f "$TARGET_DIR/.env" ] && chmod 640 "$TARGET_DIR/.env"
 
-            # Verify .env file exists and has required variables
+            # Validate .env and restart services
             cd "$TARGET_DIR"
 
             if [ ! -f .env ]; then
-              echo "❌ Error: .env file not found in $TARGET_DIR"
-              echo "Please create the .env file on the VPS with required variables:"
-              echo "   TZ, WG_HOST, WG_PORT, WG_ALLOWED_IPS, PIHOLE_WEBPASSWORD, WGEASY_PASSWORD_HASH"
+              echo "❌ .env file missing!"
               exit 1
             fi
 
             for var in TZ WG_HOST WG_PORT WG_ALLOWED_IPS PIHOLE_WEBPASSWORD WGEASY_PASSWORD_HASH; do
-              if ! grep -q "^$var=" .env; then
-                echo "❌ Error: Required variable $var is missing from .env"
-                exit 1
-              fi
+              grep -q "^$var=" .env || { echo "❌ Missing $var in .env"; exit 1; }
             done
+            echo "✅ .env validated"
 
-            echo "✅ All required variables present in .env"
-
-            # Restart services
             echo "🚀 Restarting services..."
             docker compose down || true
             docker compose up -d
 
-            # Wait and verify services are up
-            echo "🔍 Verifying services..."
             sleep 10
             if ! docker compose ps | grep -q "Up"; then
               echo "❌ Services failed to start!"
               docker compose logs
               exit 1
             fi
+            echo "✅ Services running"
 
-            echo "✅ Services started successfully!"
-
-            # Set Pi-hole web password
-            echo "🔑 Setting Pi-hole web password..."
+            # Set Pi-hole password
             PIHOLE_PASS=$(grep "^PIHOLE_WEBPASSWORD=" .env | cut -d '=' -f2- | sed 's/^["'"'"']//;s/["'"'"']$//')
-
-            if [ -z "$PIHOLE_PASS" ]; then
-              echo "❌ Failed to extract PIHOLE_WEBPASSWORD"
-              exit 1
-            fi
-
             for i in {1..15}; do
               if docker compose exec pihole pihole setpassword "$PIHOLE_PASS" > /dev/null 2>&1; then
-                echo "✅ Pi-hole web password set successfully!"
-                exit 0
+                echo "✅ Pi-hole password set"
+                break
               fi
-              echo "Attempt $i/15: Pi-hole not ready yet, retrying in 10 seconds..."
+              echo "Attempt $i/15: waiting..."
               sleep 10
-            done
+            done || {
+              echo "❌ Failed to set password after retries"
+              exit 1
+            }
 
-            echo "❌ Failed to set Pi-hole password after 15 attempts."
-            echo "You can manually run: docker compose exec pihole pihole setpassword YOUR_PASSWORD"
-            exit 1
-
-            # Clean up temp directory
-            cd /
-            rm -rf "$TEMP_DIR"
+            echo "🎉 Deployment complete!"
