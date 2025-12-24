@@ -3,83 +3,15 @@ name: Deploy to VPS
 on:
   workflow_dispatch:
     inputs:
-      force_redeploy:
-        description: 'Force redeploy even if no changes'
-        required: false
-        default: false
-        type: boolean
       cleanup:
-        description: 'Clean up persistent direcories before deploying'
+        description: 'Clean up persistent directories before deploying'
         required: false
         default: false
         type: boolean
 
 jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup SSH
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
-
-      - name: Create directory structure
-        run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "
-            mkdir -p /docker/wgpihole/{etc/pihole,etc/dnsmasq.d,etc/wireguard,scripts}
-          "
-
-      - name: Clean up persistent directories
-        if: ${{ github.event.inputs.cleanup == 'true' }}
-        run: |
-          echo "🧹 Cleaning up persistent directories..."
-          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "
-            cd /docker/wgpihole
-            find . -type f -not -path './etc/pihole/*' \
-                   -not -path './etc/dnsmasq.d/*' \
-                   -not -path './etc/wireguard/*' \
-                   -delete
-          "
-
-      - name: Transfer files to VPS
-        run: |
-          scp -o StrictHostKeyChecking=no -r \
-            --exclude='.git' \
-            --exclude='.github' \
-            --exclude='.gitignore' \
-            --exclude='.env' \
-            ./* ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/docker/wgpihole/
-
-      - name: Generate and transfer .env file
-        run: |
-          ENV_CONTENT="TZ=${{ vars.TZ }}
-          WG_HOST=${{ vars.WG_HOST }}
-          WG_ALLOWED_IPS=${{ vars.WG_ALLOWED_IPS }}
-          PIHOLE_WEBPASSWORD=${{ secrets.PIHOLE_WEBPASSWORD }}
-          WGEASY_PASSWORD_HASH=${{ secrets.WGEASY_PASSWORD_HASH }}"
-          
-          echo "$ENV_CONTENT" | ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "cat > /docker/wgpihole/.env"
-
-      - name: Start services
-        run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} '
-            cd /docker/wgpihole
-            chmod +x scripts/init-blocklists.sh
-            docker-compose down || true
-            docker-compose up -d
-            sleep 30
-            if docker-compose ps | grep -q "Up"; then
-              echo "✅ Services started successfully!"
-              echo ""
-              echo "📊 Service URLs:"
-              echo "   Pi-hole Admin: http://${{ vars.WG_HOST }}/admin"
-              echo "   WG-Easy Web:  http://${{ vars.WG_HOST }}:51821"
-            else
-              echo "❌ Services failed to start!"
-              docker-compose logs
-              exit 1
-            fi
-          '
+  call-shared-workflow:
+    uses: ./.github/workflows/_common.yml
+    with:
+      cleanup: ${{ github.event.inputs.cleanup || false }}
+    secrets: inherit

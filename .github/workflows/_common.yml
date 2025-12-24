@@ -1,0 +1,96 @@
+name: Shared Deployment Steps
+
+on:
+  workflow_call:
+    inputs:
+      cleanup:
+        required: false
+        type: boolean
+        default: false
+    secrets:
+      PIHOLE_WEBPASSWORD:
+        required: true
+      WGEASY_PASSWORD_HASH:
+        required: true
+      TZ:
+        required: true
+      WG_HOST:
+        required: true
+      WG_ALLOWED_IPS:
+        required: true
+
+jobs:
+  deploy:
+    name: Deploy Application
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup environment
+        run: |
+          set -e  # Exit on error
+          
+          # Create directory structure once
+          mkdir -p /docker/wgpihole/{etc/pihole,etc/dnsmasq.d,etc/wireguard,scripts}
+          
+          # Clean up if requested
+          if [[ "${{ inputs.cleanup }}" == "true" ]]; then
+            echo "🧹 Cleaning up persistent directories..."
+            cd /docker/wgpihole
+            find . -type f -not -path './etc/pihole/*' \
+                   -not -path './etc/dnsmasq.d/*' \
+                   -not -path './etc/wireguard/*' \
+                   -delete
+          fi
+          
+          # Copy files with proper permissions
+          echo "📂 Copying files..."
+          find . -mindepth 1 -maxdepth 1 \( 
+            -name '.git' -o 
+            -name '.github' -o 
+            -name '.gitignore' -o 
+            -name '.env' 
+          \) -prune -o -exec cp -r --no-preserve=all --remove-destination {} /docker/wgpihole/ \;
+          
+          # Set secure permissions
+          chmod -R 750 /docker/wgpihole/
+          chmod 640 /docker/wgpihole/.env 2>/dev/null || true
+
+      - name: Configure environment
+        run: |
+          cat > /docker/wgpihole/.env <<EOL
+          TZ=${{ secrets.TZ }}
+          WG_HOST=${{ secrets.WG_HOST }}
+          WG_ALLOWED_IPS=${{ secrets.WG_ALLOWED_IPS }}
+          PIHOLE_WEBPASSWORD=${{ secrets.PIHOLE_WEBPASSWORD }}
+          WGEASY_PASSWORD_HASH=${{ secrets.WGEASY_PASSWORD_HASH }}
+          EOL
+
+      - name: Start services
+        run: |
+          set -e
+          cd /docker/wgpihole
+          
+          # Ensure scripts are executable
+          chmod +x scripts/*.sh 2>/dev/null || true
+          
+          # Start services
+          echo "🚀 Starting services..."
+          docker-compose down || true
+          docker-compose up -d
+          
+          # Verify services
+          echo "🔍 Verifying services..."
+          sleep 10
+          if ! docker-compose ps | grep -q "Up"; then
+            echo "❌ Services failed to start!"
+            docker-compose logs
+            exit 1
+          fi
+          
+          echo "✅ Services started successfully!"
+          echo ""
+          echo "📊 Service URLs:"
+          echo "   Pi-hole Admin: http://${{ secrets.WG_HOST }}/admin"
+          echo "   WG-Easy Web:  http://${{ secrets.WG_HOST }}:51821"
