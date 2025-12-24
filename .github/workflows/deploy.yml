@@ -40,34 +40,36 @@ jobs:
           chmod -R 750 /docker/wgpihole/ 2>/dev/null || true
           chmod 640 /docker/wgpihole/.env 2>/dev/null || true
       
-      - name: Generate .env file
+      - name: Verify .env file
         run: |
           cd /docker/wgpihole
           
-          printf 'TZ=%s\n' "${{ vars.TZ }}" > .env
-          printf 'WG_HOST=%s\n' "${{ vars.WG_HOST }}" >> .env
-          printf 'WG_PORT=%s\n' "${{ vars.WG_PORT }}" >> .env
-          printf 'WG_ALLOWED_IPS=%s\n' "${{ vars.WG_ALLOWED_IPS }}" >> .env
-          printf 'PIHOLE_WEBPASSWORD=%s\n' "${{ secrets.PIHOLE_WEBPASSWORD }}" >> .env
-          
-          # Capture raw original hash
-          read -r ORIGINAL_HASH <<< "${{ secrets.WGEASY_PASSWORD_HASH }}"
-          
-          # Double every $ for docker-compose
-          DOUBLED_HASH=${ORIGINAL_HASH//$/$$}
-          
-          # Write safely with printf (preserves everything)
-          printf 'WGEASY_PASSWORD_HASH=%s\n' "$DOUBLED_HASH" >> .env
-          
-          # Debug
-          echo "Final .env content:"
-          cat .env
-          
-          if grep -q 'WGEASY_PASSWORD_HASH=\$\$2' .env; then
-            echo "✓ Doubled hash written correctly"
-          else
-            echo "✗ Problem"
+          if [ ! -f .env ]; then
+            echo "❌ Error: .env file not found in /docker/wgpihole"
+            echo "Please create the .env file on the VPS with the following required variables:"
+            echo "- TZ"
+            echo "- WG_HOST"
+            echo "- WG_PORT"
+            echo "- WG_ALLOWED_IPS"
+            echo "- PIHOLE_WEBPASSWORD"
+            echo "- WGEASY_PASSWORD_HASH"
+            exit 1
           fi
+          
+          echo "✅ Found existing .env file"
+          echo "=== .env file content ==="
+          cat .env
+          echo "========================="
+          
+          # Verify required variables are present
+          for var in TZ WG_HOST WG_PORT WG_ALLOWED_IPS PIHOLE_WEBPASSWORD WGEASY_PASSWORD_HASH; do
+            if ! grep -q "^$var=" .env; then
+              echo "❌ Error: Required variable $var is missing from .env"
+              exit 1
+            fi
+          done
+          
+          echo "✅ All required variables are present in .env"
 
       - name: Start services
         run: |
