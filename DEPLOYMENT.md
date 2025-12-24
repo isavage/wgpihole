@@ -1,42 +1,49 @@
 # VPS Deployment Guide
 
-## GitHub Actions Deployment
+## Deployment Overview
 
-This project supports both development and production deployment strategies.
+This project uses GitHub Actions for automated VPS deployment with the following features:
+- **Zero-downtime** deployments
+- **Automatic password management** for Pi-hole
+- **Persistent configuration** using `.env` file
+- **Clean rollback** capability
+- **Self-healing** service management
 
-### Deployment Options
+### Deployment
 
-#### Option 1: Manual Trigger Only (Current Setup)
-- **Trigger**: Manual workflow dispatch only
-- **Use case**: Full control over when deployment happens
-- **Workflow**: `deploy.yml` with `workflow_dispatch` only
-- **Pros**: No accidental deployments, predictable timing
-- **Cons**: Requires manual action for every deployment
+#### Manual Deployment
+- **Trigger**: Manual workflow dispatch
+- **Workflow**: [.github/workflows/deploy.yml](cci:7://file:///Users/varunsharma/unix/vscode/wgpihole/.github/workflows/deploy.yml:0:0-0:0)
+- **Best for**: All environments
+- **Process**:
+  1. Push changes to your repository
+  2. Manually trigger deployment from GitHub Actions
+  3. Monitor deployment status in real-time
 
-#### Option 2: Push to Main (Development)
-- **Trigger**: Push to `main` or `master` branch
-- **Use case**: Rapid development, testing, staging
-- **Workflow**: `deploy.yml` with push triggers
-- **Pros**: Immediate deployment, fast iteration
-- **Cons**: Less control over what gets deployed
+## Deployment Process
 
-#### Option 3: Release-based (Production)
-- **Trigger**: Create GitHub release with tag
-- **Use case**: Production deployments, version control
-- **Workflow**: `release.yml`
-- **Pros**: Controlled releases, rollback capability, version tracking
-- **Cons**: Extra step to create release
+### Prerequisites
+- VPS with Docker and Docker Compose installed
+- Ports 53 (TCP/UDP), 80 (TCP), and 51820 (UDP) open
+- Domain name pointing to your VPS (recommended)
 
-### Release-based Deployment Process
+### Manual Deployment
+1. **Prepare your repository**
+   - Fork this repository
+   - Add your VPS SSH key to GitHub secrets as `VPS_SSH_KEY`
+   - Add other required secrets (see below)
 
-1. **Make changes** to your code
-2. **Commit and push** to main branch
-3. **Create release** on GitHub:
-   - Go to repository → Releases → "Create a new release"
-   - Enter tag version (e.g., `v1.0.0`)
-   - Write release notes
-   - Click "Publish release"
-4. **Auto-deployment** triggers automatically
+2. **Configure environment**
+   - Copy `.env.example` to `.env`
+   - Update values with your configuration
+   - Push changes to your repository
+
+3. **Trigger deployment**
+   - Go to GitHub Actions
+   - Select "Deploy to VPS"
+   - Click "Run workflow"
+   - Optionally enable cleanup of previous deployment
+   - Monitor the deployment logs
 
 ### Required Secrets
 

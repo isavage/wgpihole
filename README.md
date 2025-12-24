@@ -1,46 +1,47 @@
 # WG-PiHole Docker Setup
 
-A Docker Compose setup that combines Pi-hole (DNS ad-blocker) with WG-Easy (WireGuard VPN manager) for secure, ad-free browsing with VPN protection.
+A secure, production-ready Docker Compose setup combining Pi-hole (DNS ad-blocker) with WG-Easy (WireGuard VPN manager) for private, ad-free internet access.
 
 ## Features
 
 - **Pi-hole**: Network-wide ad blocking with DNS filtering
 - **WG-Easy**: Simple WireGuard VPN management with web interface
-- **Hagezi Blocklists**: Comprehensive ad-blocking with automatic configuration
-- **Isolated Network**: Docker network for secure communication
-- **Persistent Data**: All configurations stored in local volumes
-- **Environment-based Configuration**: No hardcoded secrets
-- **Automated Deployment**: GitHub Actions for VPS deployment
+- **Custom Blocklists**: Pre-configured with comprehensive ad-blocking
+- **Secure by Default**: No hardcoded credentials, secure permissions
+- **Automated Deployment**: One-click VPS deployment via GitHub Actions
+- **Self-hosted**: Full control over your network and data
+- **Persistent Storage**: All configurations survive container restarts
 
 ## Quick Start
 
-1. **Clone and setup:**
+### Prerequisites
+- Docker and Docker Compose installed on your VPS
+- Ports 53 (TCP/UDP), 80 (TCP), and 51820 (UDP) open in your firewall
+- Domain name pointing to your VPS (recommended)
+
+### Deployment Steps
+
+1. **Deploy to VPS:**
    ```bash
+   # Clone the repository
    git clone <repository-url>
    cd wgpihole
-   ```
-
-2. **Configure environment:**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your settings
-   ```
-
-3. **Configure blocklists:**
-   ```bash
-   # Edit blocklists.conf to enable/disable desired lists
-   nano blocklists.conf
-   ```
-
-4. **Start services:**
-   ```bash
-   docker-compose up -d
-   ```
    
-   This will automatically:
-   - Initialize blocklists database on first run (only when no database exists)
-   - Start containers with pre-configured blocklists
-   - Use persistent database on subsequent restarts
+   # Create and configure .env file
+   cp .env.example .env
+   nano .env  # Update with your settings
+   
+   # Start the services
+   docker compose up -d
+   ```
+
+2. **Access Services:**
+   - Pi-hole Admin: `http://<your-vps-ip>/admin`
+   - WG-Easy Web UI: `http://<your-vps-ip>:51821`
+
+3. **First-Time Setup:**
+   - The deployment will automatically set your Pi-hole admin password from the `.env` file
+   - WireGuard client configurations can be downloaded from the WG-Easy web interface
 
 ## Configuration
 
