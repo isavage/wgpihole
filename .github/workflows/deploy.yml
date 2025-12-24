@@ -13,5 +13,5 @@ jobs:
   call-shared-workflow:
     uses: ./.github/workflows/_common.yml
     with:
-      cleanup: ${{ github.event.inputs.cleanup != '' && github.event.inputs.cleanup || 'false' }}
+      cleanup: ${{ github.event.inputs.cleanup != '' && github.event.inputs.cleanup }}
     secrets: inherit
