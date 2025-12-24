@@ -39,6 +39,7 @@ jobs:
           # Set secure permissions (suppress errors for container-managed files)
           chmod -R 750 /docker/wgpihole/ 2>/dev/null || true
           chmod 640 /docker/wgpihole/.env 2>/dev/null || true
+      
       - name: Generate .env file
         run: |
           cd /docker/wgpihole
@@ -49,22 +50,25 @@ jobs:
           printf 'WG_ALLOWED_IPS=%s\n' "${{ vars.WG_ALLOWED_IPS }}" >> .env
           printf 'PIHOLE_WEBPASSWORD=%s\n' "${{ secrets.PIHOLE_WEBPASSWORD }}" >> .env
           
+          # Capture the raw hash
           read -r WGEASY_HASH <<< "${{ secrets.WGEASY_PASSWORD_HASH }}"
           
-          echo "Raw WGEASY_PASSWORD_HASH value: $WGEASY_HASH"  # Still safe for debug (masked in logs)
+          # DEBUG: This will be masked in logs anyway
+          echo "Raw secret length: ${#WGEASY_HASH}"
           
-          # Fixed line:
+          # THIS IS THE CORRECT WAY — use %s and pass the variable safely
           printf 'WGEASY_PASSWORD_HASH=%s\n' "$WGEASY_HASH" >> .env
           
+          # Optional: verify it worked
           echo "Final .env content:"
           cat .env
           
-          # Your existing check (should now pass)
-          if grep -q '\$2' .env; then
-            echo "✓ .env contains \$2 (good - bcrypt hash preserved)"
+          if grep -q '^\$2y\$' .env; then
+            echo "✓ Hash starts with \$2y\$ — preserved correctly"
           else
-            echo "✗ .env does NOT contain \$2 (hash may be corrupted)"
-            grep WGEASY_PASSWORD_HASH .env | od -c
+            echo "✗ Hash is corrupted!"
+            grep WGEASY_PASSWORD_HASH .env
+            grep WGEASY_PASSWORD_HASH .env | od -c  # hex dump for diagnosis
           fi
 
       - name: Start services
