@@ -26,15 +26,15 @@ jobs:
           mkdir -p /docker/wgpihole/{etc/pihole,etc/dnsmasq.d,etc/wireguard,scripts}
           
           # Determine if we should clean up
-          if [[ "${{ github.event_name == 'release' || github.event.inputs.cleanup == 'true' }}" == "true" ]]; then
+          if [[ "${{ github.event_name == 'release' || github.event.inputs.cleanup }}" == "true" ]]; then
             echo "🧹 Cleaning up persistent directories..."
             cd /docker/wgpihole
-            find . -type f \\( -not -path './etc/pihole/*' -and -not -path './etc/dnsmasq.d/*' -and -not -path './etc/wireguard/*' \\) -delete
+            find . -type f \( -not -path './etc/pihole/*' -and -not -path './etc/dnsmasq.d/*' -and -not -path './etc/wireguard/*' \) -delete
           fi
           
           # Copy files with proper permissions
           echo "📂 Copying files..."
-          find . -mindepth 1 -maxdepth 1 \\( -name '.git' -o -name '.github' -o -name '.gitignore' -o -name '.env' \\) -prune -o -exec cp -r --no-preserve=all --remove-destination {} /docker/wgpihole/ \;
+          find . -mindepth 1 -maxdepth 1 \( -name '.git' -o -name '.github' -o -name '.gitignore' -o -name '.env' \) -prune -o -exec cp -r --no-preserve=all --remove-destination {} /docker/wgpihole/ \;
           
           # Set secure permissions
           chmod -R 750 /docker/wgpihole/
