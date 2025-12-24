@@ -16,22 +16,76 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Debug SSH connection (exact CI environment)
-        run: |
-          # Create SSH key from secret
-          mkdir -p ~/.ssh
-          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_deploy
-          chmod 600 ~/.ssh/id_deploy
+      - name: Copy files to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          source: ".,!.git*,!.github*,!.gitignore,.env"  # include all, exclude unwanted (note: .env excluded to be safe)
+          target: "/docker/wgpihole/"
+          strip_components: 1
+          overwrite: true
 
-          # Force use of only this key
-          echo "Host ${{ secrets.VPS_HOST }}" >> ~/.ssh/config
-          echo "  IdentityFile ~/.ssh/id_deploy" >> ~/.ssh/config
-          echo "  IdentitiesOnly yes" >> ~/.ssh/config
-          echo "  StrictHostKeyChecking no" >> ~/.ssh/config
-          echo "  UserKnownHostsFile /dev/null" >> ~/.ssh/config
-          chmod 600 ~/.ssh/config
+      - name: Restart services and finalize on VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          script: |
+            set -e
+            cd /docker/wgpihole
 
-          # Verbose connection test
-          ssh -v -p ${{ secrets.VPS_SSH_PORT || '22' }} \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-            "echo '🎉 SUCCESS: Connected as \$(whoami) on \$(hostname)' && pwd"
+            # Optional cleanup (keep .env)
+            if [[ "${{ inputs.cleanup }}" == "true" ]]; then
+              echo "🧹 Cleaning up persistent directories (keeping .env)..."
+              find . -mindepth 1 -not -path './.env' -delete
+            fi
+
+            # Set permissions
+            chmod -R 750 . 2>/dev/null || true
+            [ -f .env ] && chmod 640 .env
+
+            # Validate .env
+            if [ ! -f .env ]; then
+              echo "❌ .env file missing!"
+              exit 1
+            fi
+
+            for var in TZ WG_HOST WG_PORT WG_ALLOWED_IPS PIHOLE_WEBPASSWORD WGEASY_PASSWORD_HASH; do
+              grep -q "^$var=" .env || { echo "❌ Missing $var in .env"; exit 1; }
+            done
+            echo "✅ .env validated"
+
+            # Restart services
+            echo "🚀 Restarting services..."
+            docker compose down || true
+            docker compose up -d
+
+            sleep 10
+            if ! docker compose ps | grep -q "Up"; then
+              echo "❌ Services failed to start!"
+              docker compose logs
+              exit 1
+            fi
+            echo "✅ Services running"
+
+            # Set Pi-hole password
+            PIHOLE_PASS=$(grep "^PIHOLE_WEBPASSWORD=" .env | cut -d '=' -f2- | sed 's/^["'"'"']//;s/["'"'"']$//')
+            for i in {1..15}; do
+              if docker compose exec pihole pihole setpassword "$PIHOLE_PASS" > /dev/null 2>&1; then
+                echo "✅ Pi-hole password set successfully"
+                break
+              fi
+              echo "Attempt $i/15: waiting for Pi-hole..."
+              sleep 10
+            done || {
+              echo "❌ Failed to set password after retries"
+              echo "Run manually: docker compose exec pihole pihole setpassword YOUR_PASSWORD"
+              exit 1
+            }
+
+            echo "🎉 Deployment completed successfully!"
