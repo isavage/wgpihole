@@ -36,8 +36,8 @@ jobs:
           echo "📂 Copying files..."
           find . -mindepth 1 -maxdepth 1 \( -name '.git' -o -name '.github' -o -name '.gitignore' -o -name '.env' \) -prune -o -exec cp -r --no-preserve=all --remove-destination {} /docker/wgpihole/ \;
           
-          # Set secure permissions
-          chmod -R 750 /docker/wgpihole/
+          # Set secure permissions (suppress errors for container-managed files)
+          chmod -R 750 /docker/wgpihole/ 2>/dev/null || true
           chmod 640 /docker/wgpihole/.env 2>/dev/null || true
 
       - name: Generate .env file
