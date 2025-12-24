@@ -44,15 +44,18 @@ jobs:
         run: |
           cd /docker/wgpihole
           
-          # Write .env file with a here-document to prevent any variable expansion
-          cat > .env << 'EOF'
-          TZ=${{ vars.TZ }}
-          WG_HOST=${{ vars.WG_HOST }}
-          WG_PORT=${{ vars.WG_PORT }}
-          WG_ALLOWED_IPS=${{ vars.WG_ALLOWED_IPS }}
-          PIHOLE_WEBPASSWORD=${{ secrets.PIHOLE_WEBPASSWORD }}
-          WGEASY_PASSWORD_HASH=${{ secrets.WGEASY_PASSWORD_HASH }}
-          EOF
+          # Write .env file with proper escaping for the password hash
+          # Using printf to avoid any interpretation of special characters
+          printf 'TZ=%s\n' "${{ vars.TZ }}" > .env
+          printf 'WG_HOST=%s\n' "${{ vars.WG_HOST }}" >> .env
+          printf 'WG_PORT=%s\n' "${{ vars.WG_PORT }}" >> .env
+          printf 'WG_ALLOWED_IPS=%s\n' "${{ vars.WG_ALLOWED_IPS }}" >> .env
+          printf 'PIHOLE_WEBPASSWORD=%s\n' "${{ secrets.PIHOLE_WEBPASSWORD }}" >> .env
+          
+          # Handle the password hash specially to prevent any interpretation
+          echo -n 'WGEASY_PASSWORD_HASH=' >> .env
+          echo -n '$'"${{ secrets.WGEASY_PASSWORD_HASH }}" >> .env
+          echo >> .env  # Add newline at the end
           
           # Debug: Show the final .env content
           echo "Final .env content:"
