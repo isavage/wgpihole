@@ -27,10 +27,10 @@ jobs:
             set -e
             TARGET_DIR="/docker/wgpihole"
 
-            # Create target dir if needed
+            # Create target directory if it doesn't exist
             mkdir -p "$TARGET_DIR"
 
-            # Optional cleanup (keep .env)
+            # Optional full cleanup (keep only .env)
             if [[ "${{ inputs.cleanup }}" == "true" ]]; then
               echo "🧹 Cleaning up persistent directories (keeping .env)..."
               cd "$TARGET_DIR"
@@ -38,34 +38,34 @@ jobs:
               cd -
             fi
 
-            # Upload all files except unwanted ones (preserves .env on server)
+            # Upload files directly from the runner's workspace
             echo "🚚 Uploading files..."
-            cd "${{ github.workspace }}"
             rsync -av --no-perms --no-owner --no-group \
               --exclude='.git' \
               --exclude='.github' \
               --exclude='.gitignore' \
               --exclude='.env' \
-              . "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:$TARGET_DIR/" \
-              || true  # continue even if some files fail
+              "${{ github.workspace }}"/. "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:$TARGET_DIR/"
 
-            # Set permissions
+            # Set secure permissions on the server
+            ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} -p ${{ secrets.VPS_SSH_PORT || '22' }} << EOF
             chmod -R 750 "$TARGET_DIR/" 2>/dev/null || true
-            [ -f "$TARGET_DIR/.env" ] && chmod 640 "$TARGET_DIR/.env"
+            [ -f "$TARGET_DIR/.env" ] && chmod 640 "$TARGET_DIR/.env" 2>/dev/null || true
 
-            # Validate .env and restart services
             cd "$TARGET_DIR"
 
+            # Validate .env
             if [ ! -f .env ]; then
-              echo "❌ .env file missing!"
+              echo "❌ .env file missing in $TARGET_DIR!"
               exit 1
             fi
 
             for var in TZ WG_HOST WG_PORT WG_ALLOWED_IPS PIHOLE_WEBPASSWORD WGEASY_PASSWORD_HASH; do
-              grep -q "^$var=" .env || { echo "❌ Missing $var in .env"; exit 1; }
+              grep -q "^\$var=" .env || { echo "❌ Missing \$var in .env"; exit 1; }
             done
             echo "✅ .env validated"
 
+            # Restart services
             echo "🚀 Restarting services..."
             docker compose down || true
             docker compose up -d
@@ -79,17 +79,19 @@ jobs:
             echo "✅ Services running"
 
             # Set Pi-hole password
-            PIHOLE_PASS=$(grep "^PIHOLE_WEBPASSWORD=" .env | cut -d '=' -f2- | sed 's/^["'"'"']//;s/["'"'"']$//')
+            PIHOLE_PASS=\$(grep "^PIHOLE_WEBPASSWORD=" .env | cut -d '=' -f2- | sed "s/^[\"'"]//;s/[\"'"]\$//")
             for i in {1..15}; do
-              if docker compose exec pihole pihole setpassword "$PIHOLE_PASS" > /dev/null 2>&1; then
-                echo "✅ Pi-hole password set"
+              if docker compose exec pihole pihole setpassword "\$PIHOLE_PASS" > /dev/null 2>&1; then
+                echo "✅ Pi-hole password set successfully"
                 break
               fi
-              echo "Attempt $i/15: waiting..."
+              echo "Attempt \$i/15: waiting for Pi-hole to be ready..."
               sleep 10
             done || {
-              echo "❌ Failed to set password after retries"
+              echo "❌ Failed to set Pi-hole password after 15 attempts"
+              echo "Run manually: docker compose exec pihole pihole setpassword YOUR_PASSWORD"
               exit 1
             }
 
-            echo "🎉 Deployment complete!"
+            echo "🎉 Deployment completed successfully!"
+            EOF
