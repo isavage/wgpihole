@@ -6,7 +6,7 @@ services:
       wgpihole.net:
         ipv4_address: 172.20.0.2
     environment:
-      WEBPASSWORD: ${PIHOLE_WEBPASSWORD}
+      WEBPASSWORD: "${PIHOLE_WEBPASSWORD}"
       DNS1: "1.1.1.1"
       DNS2: "1.0.0.1"
       TZ: "${TZ}"
@@ -42,7 +42,7 @@ services:
       # Web UI Configuration
       WG_UI: "false"  # Enable web interface
       WG_UI_PORT: 51821  # Web UI port
-      PASSWORD_HASH: ${WGEASY_PASSWORD_HASH}  # bcrypt hash
+      PASSWORD_HASH: "${WGEASY_PASSWORD_HASH}"  # bcrypt hash
       WG_UI_AUTH: "true"  # Require auth for web UI
       TZ: "${TZ}"  # Timezone
     volumes:
