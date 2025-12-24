@@ -30,11 +30,10 @@ This project uses GitHub Actions for automated VPS deployment with the following
 ### Manual Deployment
 1. **Prepare your repository**
    - Fork this repository
-   - Add your VPS SSH key to GitHub secrets as `VPS_SSH_KEY`
-   - Add other required secrets (see below)
+   - Add required GitHub secrets (see below)
 
 2. **Configure environment**
-   - Copy `.env.example` to `.env`
+   - Create `.env` file on your VPS at `/docker/wgpihole/.env`
    - Update values with your configuration
    - Push changes to your repository
 
@@ -58,9 +57,11 @@ Create a `.env` file on your VPS at `/docker/wgpihole/.env` with the following v
 
 ### Required GitHub Secrets
 
-Only one secret is required for GitHub Actions deployment:
+Add these secrets to your GitHub repository:
 
-1. **`VPS_SSH_KEY`**: Your SSH private key for VPS access
+1. **`VPS_HOST`**: Your VPS IP address or domain
+2. **`VPS_USER`**: SSH username (usually `root` or `ubuntu`)
+3. **`VPS_SSH_KEY`**: Your SSH private key for VPS access
 
 **Note**: The workflow expects the `.env` file to already exist on the VPS. It will verify its presence and use the values from there, not from GitHub secrets.
 
@@ -83,12 +84,14 @@ Only one secret is required for GitHub Actions deployment:
 
 ### How It Works
 
-1. **Validation**: Checks if `.env` exists on VPS
-2. **Directory Setup**: Creates `/docker/wgpihole/` structure
-3. **File Deployment**: Copies all configuration files
-4. **Container Management**: Stops existing containers, starts new ones
-5. **Health Check**: Verifies services are running
-6. **Cleanup**: Removes old Docker images
+1. **File Transfer**: Uploads files to temporary directory on VPS using SCP
+2. **Validation**: Checks if `.env` exists and contains required variables
+3. **Directory Setup**: Creates `/docker/wgpihole/` structure
+4. **File Deployment**: Moves files from temp to target directory using rsync
+5. **Container Management**: Stops existing containers, starts new ones
+6. **Password Setting**: Configures Pi-hole password from `.env` file
+7. **Health Check**: Verifies services are running
+8. **Cleanup**: Removes temporary directory
 
 ### Manual Deployment (Alternative)
 
