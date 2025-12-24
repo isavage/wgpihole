@@ -52,8 +52,9 @@ jobs:
           printf 'WG_ALLOWED_IPS=%s\n' "${{ vars.WG_ALLOWED_IPS }}" >> .env
           printf 'PIHOLE_WEBPASSWORD=%s\n' "${{ secrets.PIHOLE_WEBPASSWORD }}" >> .env
           
-          # Handle the password hash with single quotes to prevent any interpretation
-          echo "WGEASY_PASSWORD_HASH='${{ secrets.WGEASY_PASSWORD_HASH }}'" >> .env
+          # Get the password hash directly from the secret
+          WGEASY_HASH=$(echo "${{ secrets.WGEASY_PASSWORD_HASH }}" | tr -d '\n')
+          echo "WGEASY_PASSWORD_HASH='$WGEASY_HASH'" >> .env
           
           # Debug: Show the final .env content
           echo "Final .env content:"
