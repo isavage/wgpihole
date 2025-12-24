@@ -97,14 +97,14 @@ jobs:
           
           echo "🔑 Injecting hardcoded WEBPASSWORD into docker-compose.yml..."
           
-          # Step 1: Remove any existing WEBPASSWORD line (any format, any indentation)
-          sed -i '/^\s*WEBPASSWORD[:=]/d' docker-compose.yml
-          
-          # Step 2: Find the indentation of the environment: line and insert the new line right after it
-          # This captures the exact leading whitespace of the environment: line
-          if grep -q '^\s*environment:' docker-compose.yml; then
+          # Replace the WEBPASSWORD value in docker-compose.yml
+          if grep -q '^\s*WEBPASSWORD\s*:' docker-compose.yml; then
+            # If WEBPASSWORD already exists, update its value
+            sed -i -E "s/^(\s*WEBPASSWORD\s*:).*/\1 \"$PIHOLE_PASS\"/" docker-compose.yml
+          elif grep -q '^\s*environment:' docker-compose.yml; then
+            # If environment section exists but no WEBPASSWORD, add it with proper indentation
             INDENT=$(grep -m1 '^\s*environment:' docker-compose.yml | sed 's/\(environment:.*$\)//')
-            sed -i "/^\s*environment:/a ${INDENT}  WEBPASSWORD: \"$PIHOLE_PASS\"" docker-compose.yml
+            sed -i "/^\s*environment:/a \\${INDENT}  WEBPASSWORD: \"$PIHOLE_PASS\"" docker-compose.yml
           else
             echo "❌ Could not find 'environment:' section in docker-compose.yml"
             exit 1

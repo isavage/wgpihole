@@ -6,7 +6,7 @@ services:
       wgpihole.net:
         ipv4_address: 172.20.0.2
     environment:
-      WEBPASSWORD: "${PIHOLE_WEBPASSWORD}"
+      WEBPASSWORD: "password"
       DNS1: "1.1.1.1"
       DNS2: "1.0.0.1"
       TZ: "${TZ}"
