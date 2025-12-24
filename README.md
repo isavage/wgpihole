@@ -64,7 +64,7 @@ The project uses `adblock.list` for custom blocklists. You can edit this file to
 nano adblock.list
 ```
 
-The file contains URLs to various blocklist sources that will be automatically loaded by Pi-hole.
+The file contains URLs to various blocklist sources that will be automatically loaded by Pi-hole. We use blocklists from [Hagezi DNS Blocklists](https://github.com/hagezi/dns-blocklists) which provide comprehensive and well-maintained ad-blocking lists.
 
 #### WG-Easy Configuration
 - `WGEASY_PASSWORD_HASH`: bcrypt hash for VPN web interface

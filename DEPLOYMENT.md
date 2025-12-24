@@ -56,6 +56,8 @@ Create a `.env` file on your VPS at `/docker/wgpihole/.env` with the following v
 5. **`WG_ALLOWED_IPS`**: VPN routing (e.g., `0.0.0.0/0`)
 6. **`TZ`**: Your timezone (e.g., `America/New_York`)
 
+**Note**: The `adblock.list` file contains blocklists from [Hagezi DNS Blocklists](https://github.com/hagezi/dns-blocklists) which provide comprehensive ad-blocking coverage. You can modify this file to customize your blocklist sources.
+
 ### Required GitHub Secrets
 
 Only one secret is required for GitHub Actions deployment:
