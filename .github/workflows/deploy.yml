@@ -66,9 +66,9 @@ jobs:
           # Verify services
           echo "🔍 Verifying services..."
           sleep 10
-          if ! docker-compose ps | grep -q "Up"; then
+          if ! docker compose ps | grep -q "Up"; then
             echo "❌ Services failed to start!"
-            docker-compose logs
+            docker compose logs
             exit 1
           fi
           
