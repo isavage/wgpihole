@@ -50,20 +50,23 @@ jobs:
           printf 'WG_ALLOWED_IPS=%s\n' "${{ vars.WG_ALLOWED_IPS }}" >> .env
           printf 'PIHOLE_WEBPASSWORD=%s\n' "${{ secrets.PIHOLE_WEBPASSWORD }}" >> .env
           
-          read -r WGEASY_HASH <<< "${{ secrets.WGEASY_PASSWORD_HASH }}"
+          # Capture raw original hash
+          read -r ORIGINAL_HASH <<< "${{ secrets.WGEASY_PASSWORD_HASH }}"
           
-          # Safe write - this preserves all $ exactly
-          printf 'WGEASY_PASSWORD_HASH=%s\n' "$WGEASY_HASH" >> .env
+          # Double every $ for docker-compose
+          DOUBLED_HASH=${ORIGINAL_HASH//$/$$}
           
-          # Debug checks
+          # Write safely with printf (preserves everything)
+          printf 'WGEASY_PASSWORD_HASH=%s\n' "$DOUBLED_HASH" >> .env
+          
+          # Debug
           echo "Final .env content:"
           cat .env
           
-          if grep -q '^\$2y\$' .env; then
-            echo "✓ Hash preserved correctly (starts with \$2y\$)"
+          if grep -q 'WGEASY_PASSWORD_HASH=\$\$2' .env; then
+            echo "✓ Doubled hash written correctly"
           else
-            echo "✗ Still corrupted"
-            grep WGEASY_PASSWORD_HASH .env | od -c  # detailed byte view
+            echo "✗ Problem"
           fi
 
       - name: Start services
