@@ -110,7 +110,7 @@ jobs:
 
             # Set Pi-hole password using Doppler secret
             for i in {1..15}; do
-              if doppler run -- docker compose exec pihole pihole setpassword "$PIHOLE_WEBPASSWORD" > /dev/null 2>&1; then
+              if doppler run -- sh -lc 'docker compose exec pihole pihole setpassword "$PIHOLE_WEBPASSWORD"' > /dev/null 2>&1; then
                 echo "✅ Pi-hole password set successfully"
                 break
               fi
