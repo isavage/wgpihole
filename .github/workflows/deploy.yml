@@ -65,7 +65,7 @@ jobs:
             # Optional cleanup: wipe everything before deploy
             if [ "${{ inputs.cleanup }}" = "true" ]; then
               echo "🧹 Cleaning up persistent directories..."
-              find . -mindepth 1 -delete
+              sudo find . -mindepth 1 -delete
             fi
 
             # Move files from temp to target (fast, atomic-ish)
@@ -75,8 +75,6 @@ jobs:
             # Clean up temp directory
             rm -rf "$TEMP_DIR"
 
-            # Remove any local env files from the target host
-            rm -f .env .env.doppler
 
             # Install Doppler CLI if needed
             if ! command -v doppler >/dev/null 2>&1; then
