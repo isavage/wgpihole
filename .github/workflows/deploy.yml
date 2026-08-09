@@ -80,9 +80,12 @@ jobs:
 
             # Install Doppler CLI if needed
             if ! command -v doppler >/dev/null 2>&1; then
-              echo "⬇️ Installing Doppler CLI..."
-              curl -sL https://cli.doppler.com/install.sh | sh
+              echo "⬇️ Installing Doppler CLI to user path..."
+              mkdir -p "$HOME/.local/bin"
+              PATH="$HOME/.local/bin:$PATH"
+              curl -sL https://cli.doppler.com/install.sh | sh -s -- --install-path "$HOME/.local/bin"
             fi
+            PATH="$HOME/.local/bin:$PATH"
 
             # Validate Doppler secrets and run compose with them directly
             echo "🔐 Validating Doppler secrets..."
