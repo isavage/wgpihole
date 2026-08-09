@@ -27,8 +27,7 @@ A secure, production-ready Docker Compose setup combining Pi-hole (DNS ad-blocke
 ```bash
 git clone <repository-url>
 cd wgpihole
-cp .env.example .env
-nano .env  # Update with your settings
+# Configure secrets in Doppler instead of using a local .env file
 docker compose up -d
 ```
 
@@ -42,15 +41,15 @@ docker compose up -d
 - WG-Easy Web UI: `http://<your-vps-ip>:51821`
 
 ### First-Time Setup
-   - The Pi-hole admin password is set from the `PIHOLE_WEBPASSWORD` variable in your `.env` file
+   - The Pi-hole admin password is set from the `PIHOLE_WEBPASSWORD` secret in Doppler
    - WireGuard client configurations can be downloaded from the WG-Easy web interface
    - Allow a few minutes for services to fully initialize on first startup
 
 ## Configuration
 
-### Environment Variables (.env)
+### Doppler Secrets
 
-Copy `.env.example` to `.env` and configure:
+Configure these secrets in Doppler instead of using a local `.env` file:
 
 #### Pi-hole Configuration
 - `PIHOLE_WEBPASSWORD`: Admin password for Pi-hole web interface
@@ -69,8 +68,9 @@ The file contains URLs to various blocklist sources that will be automatically l
 #### WG-Easy Configuration
 - `WGEASY_PASSWORD_HASH`: bcrypt hash for VPN web interface
 - `WG_HOST`: Your server's public IP or domain
-- `WG_PORT`: WireGuard UDP port (default: 51820)
 - `WG_ALLOWED_IPS`: Routes to push to clients
+
+> `WG_PORT` is fixed to `51820` in this deployment setup.
 
 #### Network Options for `WG_ALLOWED_IPS`:
 - **Full tunnel**: `0.0.0.0/0` (all traffic through VPN)
@@ -89,7 +89,7 @@ The file contains URLs to various blocklist sources that will be automatically l
 
 **Can't access Pi-hole admin:**
 - Wait a few minutes for services to fully start
-- The password is automatically set from your `.env` file
+- The password is automatically set from your Doppler `PIHOLE_WEBPASSWORD` secret
 - Try accessing via `http://<your-vps-ip>/admin`
 
 **VPN connection issues:**
