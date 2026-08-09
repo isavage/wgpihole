@@ -6,11 +6,11 @@ services:
       wgpihole.net:
         ipv4_address: 172.20.0.2
     environment:
-      TZ: "${TZ}"
+      TZ: "America/New_York"
       WEBTHEME: "default-darker"
       DNS1: "1.1.1.1"
       DNS2: "1.0.0.1"
-      WEBPASSWORD: "your_password"
+      WEBPASSWORD: "${PIHOLE_WEBPASSWORD}"
     volumes:
       - './etc/pihole:/etc/pihole'
       - './etc/dnsmasq.d:/etc/dnsmasq.d'
@@ -29,20 +29,20 @@ services:
       wgpihole.net:
         ipv4_address: 172.20.0.3  # Static IP in Docker network
     environment:
-      # VPN Configuration
-      WG_HOST: "${WG_HOST}"  # Server's public IP or domain
+      # VPN Configuration (host provided by Doppler at deploy time)
+      WG_HOST: "${WG_HOST}"
       WG_PORT: 51820  # WireGuard UDP port
       WG_DEFAULT_DNS: "172.20.0.2"  # Pi-hole via network alias
-      WG_DEFAULT_ENDPOINT: "${WG_HOST}:${WG_PORT}"  # Client connection endpoint
-      WG_ALLOWED_IPS: "${WG_ALLOWED_IPS}"  # Full tunnel by default
+      WG_DEFAULT_ENDPOINT: "${WG_HOST}:51820"  # Client connection endpoint
+      WG_ALLOWED_IPS: "0.0.0.0/0"  # Full tunnel by default
       WG_CONFIG: "/etc/wireguard"  # Config storage path
       WG_PERSISTENT_KEEPALIVE: 25
       # Web UI Configuration
       WG_UI: "false"  # Enable web interface
       WG_UI_PORT: 51821  # Web UI port
-      PASSWORD_HASH: "${WGEASY_PASSWORD_HASH}"  # bcrypt hash
+      PASSWORD_HASH: "${WGEASY_PASSWORD_HASH}"
       WG_UI_AUTH: "true"  # Require auth for web UI
-      TZ: "${TZ}"  # Timezone
+      TZ: "America/New_York"  # Timezone
     volumes:
       - './etc/wireguard:/etc/wireguard'  # Persistent VPN config storage
     ports:

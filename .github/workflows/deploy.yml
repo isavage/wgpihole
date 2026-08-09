@@ -38,7 +38,7 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: 22
-          source: ".,!.git*,!.github*,!.gitignore,.env"
+          source: ".,!.git*,!.github*,!.gitignore,!.env,!.env.doppler"
           target: "/tmp/wgpihole-deploy-temp/"
           strip_components: 1
           overwrite: true
@@ -60,10 +60,12 @@ jobs:
             mkdir -p "$TARGET_DIR"
             cd "$TARGET_DIR"
 
-            # Optional cleanup: wipe everything except .env
-            if [[ "${{ inputs.cleanup }}" == "true" ]]; then
-              echo "🧹 Cleaning up persistent directories (keeping .env)..."
-              find . -mindepth 1 -not -path './.env' -delete
+            export DOPPLER_TOKEN="${{ secrets.DOPPLER_TOKEN }}"
+
+            # Optional cleanup: wipe everything before deploy
+            if [ "${{ inputs.cleanup }}" = "true" ]; then
+              echo "🧹 Cleaning up persistent directories..."
+              find . -mindepth 1 -delete
             fi
 
             # Move files from temp to target (fast, atomic-ish)
@@ -73,43 +75,39 @@ jobs:
             # Clean up temp directory
             rm -rf "$TEMP_DIR"
 
-            # Set permissions
-            chmod -R 750 . 2>/dev/null || true
-            [ -f .env ] && chmod 640 .env
+            # Remove any local env files from the target host
+            rm -f .env .env.doppler
 
-            # Validate
-            if [ ! -f .env ]; then
-              echo "❌ .env file missing!"
-              exit 1
+            # Install Doppler CLI if needed
+            if ! command -v doppler >/dev/null 2>&1; then
+              echo "⬇️ Installing Doppler CLI..."
+              curl -sL https://cli.doppler.com/install.sh | sh
             fi
 
-            if [ ! -f docker-compose.yml ]; then
-              echo "❌ docker-compose.yml missing!"
+            # Validate Doppler secrets and run compose with them directly
+            echo "🔐 Validating Doppler secrets..."
+            if ! doppler run -- sh -lc 'test -n "$PIHOLE_WEBPASSWORD" && test -n "$WGEASY_PASSWORD_HASH" && test -n "$WG_HOST"'; then
+              echo "❌ Required Doppler secrets are missing or empty"
               exit 1
             fi
+            echo "✅ Doppler secrets validated"
 
-            for var in TZ WG_HOST WG_PORT WG_ALLOWED_IPS PIHOLE_WEBPASSWORD WGEASY_PASSWORD_HASH; do
-              grep -q "^$var=" .env || { echo "❌ Missing $var in .env"; exit 1; }
-            done
-            echo "✅ .env validated"
-
-            # Restart services
+            # Restart services using Doppler-injected environment
             echo "🚀 Restarting services..."
-            docker compose down || true
-            docker compose up -d
+            doppler run -- docker compose down || true
+            doppler run -- docker compose up -d
 
             sleep 10
-            if ! docker compose ps | grep -q "Up"; then
+            if ! doppler run -- docker compose ps | grep -q "Up"; then
               echo "❌ Services failed to start!"
-              docker compose logs
+              doppler run -- docker compose logs
               exit 1
             fi
             echo "✅ Services running"
 
-            # Set Pi-hole password
-            PIHOLE_PASS=$(grep "^PIHOLE_WEBPASSWORD=" .env | cut -d '=' -f2- | sed 's/^["'"'"']//;s/["'"'"']$//')
+            # Set Pi-hole password using Doppler secret
             for i in {1..15}; do
-              if docker compose exec pihole pihole setpassword "$PIHOLE_PASS" > /dev/null 2>&1; then
+              if doppler run -- docker compose exec pihole pihole setpassword "$PIHOLE_WEBPASSWORD" > /dev/null 2>&1; then
                 echo "✅ Pi-hole password set successfully"
                 break
               fi
