@@ -17,6 +17,12 @@ on:
         type: boolean
         default: false
 
+  push:
+      branches: [ main, master ]
+      paths-ignore:
+        - '.gitignore'
+        - 'README.md'
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
