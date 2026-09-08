@@ -47,7 +47,8 @@ services:
       - './etc/wireguard:/etc/wireguard'  # Persistent VPN config storage
     ports:
       - "51820:51820/udp"  # WireGuard VPN port
-      - "51821:51821/tcp"  # Web management interface
+    expose:
+      - "51821/tcp"  # Web management interface
     cap_add:  # Special privileges
       - NET_ADMIN  # Manage network interfaces
       - SYS_MODULE  # Load kernel modules
