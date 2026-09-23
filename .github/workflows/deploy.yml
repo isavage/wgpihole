@@ -37,7 +37,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          port: 22
+          port: 2222
           source: ".,!.git*,!.github*,!.gitignore,!.env,!.env.doppler"
           target: "/tmp/wgpihole-deploy-temp/"
           strip_components: 1
@@ -49,7 +49,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          port: 22
+          port: 2222
           script: |
             set -e
 
@@ -98,13 +98,31 @@ jobs:
             doppler run -- docker compose down || true
             doppler run -- docker compose up -d
 
-            sleep 10
-            if ! doppler run -- docker compose ps | grep -q "Up"; then
-              echo "❌ Services failed to start!"
-              doppler run -- docker compose logs
+            # Wait for containers to become healthy (healthchecks defined in docker-compose.yml)
+            echo "🩺 Waiting for services to become healthy..."
+            HEALTHY=false
+            for i in {1..24}; do
+              STATUS=$(doppler run -- docker compose ps --format '{{.Status}}')
+              echo "$STATUS"
+              if echo "$STATUS" | grep -q 'unhealthy'; then
+                echo "❌ A service reported unhealthy!"
+                doppler run -- docker compose logs --tail=100
+                exit 1
+              fi
+              TOTAL=$(echo "$STATUS" | wc -l | tr -d ' ')
+              OK=$(echo "$STATUS" | grep -c 'healthy)')
+              if [ "$TOTAL" -gt 0 ] && [ "$OK" -eq "$TOTAL" ]; then
+                HEALTHY=true
+                break
+              fi
+              sleep 10
+            done
+            if [ "$HEALTHY" != "true" ]; then
+              echo "❌ Services did not become healthy in time (4 min)!"
+              doppler run -- docker compose logs --tail=100
               exit 1
             fi
-            echo "✅ Services running"
+            echo "✅ Services running and healthy"
 
             # Set Pi-hole password using Doppler secret
             for i in {1..15}; do
