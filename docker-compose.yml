@@ -20,8 +20,8 @@ services:
       - "53/udp"
       - "80/tcp"
     healthcheck:
-      # DNS must resolve
-      test: ["CMD-SHELL", 'dig +short +norecurse +retry=0 @127.0.0.1 pi.hole >/dev/null']
+      # DNS must resolve AND the Web UI/FTL API must answer (unauthenticated login info endpoint)
+      test: ["CMD-SHELL", 'dig +short +norecurse +retry=0 @127.0.0.1 pi.hole >/dev/null && curl -fs http://127.0.0.1/api/info/login | grep -q dns']
       interval: 30s
       timeout: 10s
       retries: 3
