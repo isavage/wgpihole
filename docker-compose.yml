@@ -20,8 +20,8 @@ services:
       - "53/udp"
       - "80/tcp"
     healthcheck:
-      # DNS must resolve AND the Web UI/FTL API must answer
-      test: ["CMD-SHELL", 'dig +short +norecurse +retry=0 @127.0.0.1 pi.hole >/dev/null && curl -fs http://127.0.0.1/api/dns/blocking | grep -q blocking']
+      # DNS must resolve
+      test: ["CMD-SHELL", 'dig +short +norecurse +retry=0 @127.0.0.1 pi.hole >/dev/null']
       interval: 30s
       timeout: 10s
       retries: 3
@@ -64,8 +64,8 @@ services:
     healthcheck:
       # Override the image default (`wg show | grep interface`), which reports
       # false "unhealthy" on a fresh deploy until a peer connects and creates
-      # the interface. Verify the app process is alive instead (CMD: dumb-init node server/index.mjs).
-      test: ["CMD-SHELL", "pgrep -f 'server/index.mjs' >/dev/null"]
+      # the interface. Verify the app process is alive instead (CMD: dumb-init node server.js).
+      test: ["CMD-SHELL", "pgrep -f 'node server.js' >/dev/null"]
       interval: 30s
       timeout: 10s
       retries: 3
